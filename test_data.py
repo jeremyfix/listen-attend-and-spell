@@ -10,9 +10,10 @@ import torch.utils
 from torch.nn.utils.rnn import pad_sequence
 import torchaudio
 from torchaudio.datasets import COMMONVOICE
-from torchaudio.transforms import Spectrogram
+from torchaudio.transforms import Spectrogram, AmplitudeToDB, MelScale, MelSpectrogram
 import tqdm
 from nltk.tokenize import word_tokenize
+
 
 # Download the tokenizer
 import nltk
@@ -96,6 +97,7 @@ class TrimZeroPad(object):
         max_len = max([w.shape[1] for w in waveforms])
 
         # Pad and stack the variable length tensors
+        # waveforms is a 2D tensor (Batch, Time)
         waveforms = pad_sequence([t.squeeze() for t in waveforms],
                                  batch_first=True)
         if len(rates) != 1:
@@ -105,22 +107,50 @@ class TrimZeroPad(object):
 
 
 def test002():
+    import numpy as np
+    import matplotlib.pyplot as plt
     batch_size = 4
     n_threads = 4
     dataset = load_dataset('train')
     trim_zero_pad = TrimZeroPad()
     loader = torch.utils.data.DataLoader(dataset,
                                          batch_size=batch_size,
-                                         shuffle=True,
+                                         shuffle=False,
                                          num_workers=n_threads,
                                          collate_fn=trim_zero_pad)
 
-    waveforms, rates, transcripts = next(iter(loader))
+    waveforms, rate, transcripts = next(iter(loader))
+
+    win_length = 25 # ms
+    win_step = 15 # ms
+    nfft = int(win_length*1e-3*rate)
+    noverlap = int(win_step * 1e-3 * rate)
 
     transform = nn.Sequential(
-        Spectrogram()
+        Spectrogram(n_fft=nfft, hop_length = noverlap),
+        MelScale(),
+        AmplitudeToDB()
+        # MelSpectrogram(sample_rate=rate, 
+        #               n_fft=nfft,
+        #               hop_length=noverlap)
     )
     spectro = transform(waveforms)
+
+    fig, axes = plt.subplots(nrows=batch_size, ncols=1)
+    for iax, (ax, spectroi) in enumerate(zip(axes, spectro)):
+        # ax.specgram(waveforms[iax].numpy(), nfft, rate, noverlap=noverlap)
+
+        #TODO: not completly sure about the time x-axis extent
+        ax.imshow(spectroi,
+                  extent=[0, spectroi.shape[0]*win_step*1e-3,0, spectro.max()],
+                  aspect='auto',
+                 origin='lower')
+        ax.set_title('{}'.format(transcripts[iax]))
+        ax.set_label("Time (s.)")
+    plt.tight_layout()
+    plt.savefig('specro.png')
+    plt.show()
+
 
 
 
