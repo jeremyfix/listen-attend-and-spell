@@ -16,3 +16,16 @@ This is a tentative pytorch reimplementation of the image captioning network Lis
   doi={10.1109/ICASSP.2016.7472621}
 }
 ```
+
+# How to
+
+## Get the data
+
+The data we use are provided by the [Common voice Mozilla project](https://commonvoice.mozilla.org/en). In this project, we use the [French dataset](https://commonvoice.mozilla.org/en/datasets). You need to manually download the files and extract the archive somewhere on your drive; torchaudio cannot download the data for you since you need to accept the Mozilla terms for using the common voice datasets.
+
+## Testing the notebooks
+
+```
+pipenv install jupyterlab matplotlib torchaudio
+pipenv run jupyter lab
+```
