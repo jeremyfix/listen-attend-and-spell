@@ -72,7 +72,9 @@ class CharMap(object):
             self.equivalent_char[c] = '.'
         for c in ['-', '…', ':']:
             self.equivalent_char[c] = ' '
-        self.equivalent_char['œ'] = 'oe'
+        self.equivalent_char['—'] = ''
+        # This 'œ' in self.equivalent_char returns False... why ?
+        # self.equivalent_char['œ'] = 'oe'
         self.equivalent_char['ç'] = 'c'
         self.equivalent_char['’'] = '\''
 
@@ -195,7 +197,8 @@ def get_dataloaders(commonvoice_root: str,
 if __name__ == '__main__':
     # Data loading
     train_loader, valid_loader, test_loader = get_dataloaders(_DEFAULT_COMMONVOICE_ROOT,
-                                                              n_threads=4)
+                                                              n_threads=4,
+                                                             batch_size=10)
 
     X, y = next(iter(train_loader))
     print(X.shape)
@@ -203,3 +206,6 @@ if __name__ == '__main__':
     charmap = CharMap()
     for yi in y:
         print(charmap.decode(yi))
+
+    print(charmap.decode(charmap.encode("nous sommes heureux de vous souhaiter nos meilleurs vœux pour 2015")))
+    print('œ' in charmap.char2idx)
