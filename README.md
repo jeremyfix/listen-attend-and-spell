@@ -25,7 +25,7 @@ The data we use are provided by the [Common voice Mozilla project](https://commo
 
 Computing the spectrogram with a Short Time Fourier Transform (window size of 25ms with a window step of 15 ms), we get the example spectrograms in Mel scale below :
 
-![Spectrogram](https://github.com/jeremyfix/listen-attend-spell/blob/main/figs/spectro.png?raw=true)
+![Spectrogram](https://raw.githubusercontent.com/jeremyfix/listen-attend-and-spell/main/figs/specro.png)
 
 ## Testing the notebooks
 
