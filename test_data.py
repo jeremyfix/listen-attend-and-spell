@@ -130,11 +130,13 @@ def test002():
     win_step = 15  # ms
     nfft = int(win_length*1e-3*rate)
     nstep = int(win_step * 1e-3 * rate)
+    nmel = 40
 
     transform = nn.Sequential(
         MelSpectrogram(sample_rate=rate,
                        n_fft=nfft,
-                       hop_length=nstep),
+                       hop_length=nstep,
+                       n_mels=nmel),
         AmplitudeToDB()
     )
     spectro = transform(waveforms)
