@@ -94,7 +94,7 @@ class TrimZeroPad(object):
         rates = set([r for _, r, _ in batch])
         transcripts = [d['sentence'] for _, _, d in batch]
         # Retrieve the maximal length in the list of waveforms
-        max_len = max([w.shape[1] for w in waveforms])
+        # max_len = max([w.shape[1] for w in waveforms])
 
         # Pad and stack the variable length tensors
         # waveforms is a 2D tensor (Batch, Time)
@@ -107,6 +107,9 @@ class TrimZeroPad(object):
 
 
 def test002():
+    """
+    Plot the MelSpectrogram using torchaudio transforms
+    """
     import numpy as np
     import matplotlib.pyplot as plt
     batch_size = 4
@@ -121,36 +124,34 @@ def test002():
 
     waveforms, rate, transcripts = next(iter(loader))
 
-    win_length = 25 # ms
-    win_step = 15 # ms
+    win_length = 25  # ms
+    win_step = 15  # ms
     nfft = int(win_length*1e-3*rate)
     nstep = int(win_step * 1e-3 * rate)
 
     transform = nn.Sequential(
         MelSpectrogram(sample_rate=rate,
-                      n_fft=nfft,
-                      hop_length=nstep),
+                       n_fft=nfft,
+                       hop_length=nstep),
         AmplitudeToDB()
     )
     spectro = transform(waveforms)
 
-    fig, axes = plt.subplots(nrows=batch_size, ncols=1)
+    _, axes = plt.subplots(nrows=batch_size, ncols=1, sharex=True)
     for iax, (ax, spectroi) in enumerate(zip(axes, spectro)):
         # spectroi is of shape n_mel x n_steps
         ax.imshow(spectroi,
                   extent=[0, spectroi.shape[1]*win_step*1e-3,
-                          0, spectro.max()],
+                          0, spectroi.shape[0]],
                   aspect='auto',
                   cmap='magma',
-                 origin='lower')
+                  origin='lower')
+        ax.set_ylabel('Mel scale')
         ax.set_title('{}'.format(transcripts[iax]))
-        ax.set_label("Time (s.)")
+    plt.xlabel('Time (s.)')
     plt.tight_layout()
     plt.savefig('specro.png')
     plt.show()
-
-
-
 
 
 if __name__ == '__main__':
