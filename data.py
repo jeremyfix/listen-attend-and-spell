@@ -105,6 +105,7 @@ class BatchCollate(object):
     _DEFAULT_RATE = 48000  # Hz
     _DEFAULT_WIN_LENGTH = 25  # ms
     _DEFAULT_WIN_STEP = 15  # ms
+    _DEFAULT_NUM_MELS = 40
 
     def __init__(self):
         nfft = int(self._DEFAULT_WIN_LENGTH * 1e-3 * self._DEFAULT_RATE)
@@ -112,7 +113,8 @@ class BatchCollate(object):
         self.transform = nn.Sequential(
             MelSpectrogram(sample_rate=self._DEFAULT_RATE,
                            n_fft=nfft,
-                           hop_length=nstep),
+                           hop_length=nstep,
+                           n_mels=self._DEFAULT_NUM_MELS),
             AmplitudeToDB()
         )
         self.charmap = CharMap()
