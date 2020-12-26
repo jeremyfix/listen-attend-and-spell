@@ -17,6 +17,10 @@ import nltk
 nltk.download('punkt')
 
 _DEFAULT_COMMONVOICE_ROOT = "/opt/Datasets/CommonVoice/fr_79h_2019-02-25/fr"
+_DEFAULT_RATE = 48000  # Hz
+_DEFAULT_WIN_LENGTH = 25  # ms
+_DEFAULT_WIN_STEP = 15  # ms
+_DEFAULT_NUM_MELS = 40
 
 
 def load_dataset(fold: str,
@@ -102,19 +106,15 @@ class BatchCollate(object):
     """
     Collator for the individual data to build up the minibatches
     """
-    _DEFAULT_RATE = 48000  # Hz
-    _DEFAULT_WIN_LENGTH = 25  # ms
-    _DEFAULT_WIN_STEP = 15  # ms
-    _DEFAULT_NUM_MELS = 40
 
     def __init__(self):
-        nfft = int(self._DEFAULT_WIN_LENGTH * 1e-3 * self._DEFAULT_RATE)
-        nstep = int(self._DEFAULT_WIN_STEP * 1e-3 * self._DEFAULT_RATE)
+        nfft = int(_DEFAULT_WIN_LENGTH * 1e-3 * _DEFAULT_RATE)
+        nstep = int(_DEFAULT_WIN_STEP * 1e-3 * _DEFAULT_RATE)
         self.transform = nn.Sequential(
-            MelSpectrogram(sample_rate=self._DEFAULT_RATE,
+            MelSpectrogram(sample_rate=_DEFAULT_RATE,
                            n_fft=nfft,
                            hop_length=nstep,
-                           n_mels=self._DEFAULT_NUM_MELS),
+                           n_mels=_DEFAULT_NUM_MELS),
             AmplitudeToDB()
         )
         self.charmap = CharMap()
@@ -153,7 +153,7 @@ class BatchCollate(object):
 
         if len(rates) != 1:
             raise NotImplementedError("Cannot deal with more than 1 sample rate in the data")
-        if rates.pop() != self._DEFAULT_RATE:
+        if rates.pop() != _DEFAULT_RATE:
             raise NotImplementedError("One batch is using a sampling rate different"
                                       f" from the assumed {self._DEFAULT_RATE} Hz")
         return spectrograms, transcripts
