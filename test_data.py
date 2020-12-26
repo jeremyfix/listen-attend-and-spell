@@ -115,7 +115,7 @@ def test002():
     trim_zero_pad = TrimZeroPad()
     loader = torch.utils.data.DataLoader(dataset,
                                          batch_size=batch_size,
-                                         shuffle=False,
+                                         shuffle=True,
                                          num_workers=n_threads,
                                          collate_fn=trim_zero_pad)
 
@@ -124,26 +124,24 @@ def test002():
     win_length = 25 # ms
     win_step = 15 # ms
     nfft = int(win_length*1e-3*rate)
-    noverlap = int(win_step * 1e-3 * rate)
+    nstep = int(win_step * 1e-3 * rate)
 
     transform = nn.Sequential(
-        Spectrogram(n_fft=nfft, hop_length = noverlap),
-        MelScale(),
+        MelSpectrogram(sample_rate=rate,
+                      n_fft=nfft,
+                      hop_length=nstep),
         AmplitudeToDB()
-        # MelSpectrogram(sample_rate=rate, 
-        #               n_fft=nfft,
-        #               hop_length=noverlap)
     )
     spectro = transform(waveforms)
 
     fig, axes = plt.subplots(nrows=batch_size, ncols=1)
     for iax, (ax, spectroi) in enumerate(zip(axes, spectro)):
-        # ax.specgram(waveforms[iax].numpy(), nfft, rate, noverlap=noverlap)
-
-        #TODO: not completly sure about the time x-axis extent
+        # spectroi is of shape n_mel x n_steps
         ax.imshow(spectroi,
-                  extent=[0, spectroi.shape[0]*win_step*1e-3,0, spectro.max()],
+                  extent=[0, spectroi.shape[1]*win_step*1e-3,
+                          0, spectro.max()],
                   aspect='auto',
+                  cmap='magma',
                  origin='lower')
         ax.set_title('{}'.format(transcripts[iax]))
         ax.set_label("Time (s.)")

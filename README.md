@@ -23,6 +23,10 @@ This is a tentative pytorch reimplementation of the image captioning network Lis
 
 The data we use are provided by the [Common voice Mozilla project](https://commonvoice.mozilla.org/en). In this project, we use the [French dataset](https://commonvoice.mozilla.org/en/datasets). You need to manually download the files and extract the archive somewhere on your drive; torchaudio cannot download the data for you since you need to accept the Mozilla terms for using the common voice datasets.
 
+Computing the spectrogram with a Short Time Fourier Transform (window size of 25ms with a window step of 15 ms), we get the example spectrograms in Mel scale below :
+
+![Spectrogram](./figs/spectro.png)
+
 ## Testing the notebooks
 
 ```
