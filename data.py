@@ -83,6 +83,10 @@ class CharMap(object):
         self.equivalent_char['’'] = '\''
 
     @property
+    def vocab_size(self):
+        return len(self.idx2char)
+
+    @property
     def eoschar(self):
         return chr(self._EOS)
 

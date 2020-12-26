@@ -24,14 +24,23 @@ def train(args):
     # Data loading
     train_loader, valid_loader, test_loader = data.get_dataloaders(data._DEFAULT_COMMONVOICE_ROOT,
                                                                   n_threads=args.nthreads)
+    # We need the char map to know about the vocabulary size
+    charmap = data.CharMap()
+    vocab_size = charmap.vocab_size
+
     n_mels = data._DEFAULT_NUM_MELS
-    model = models.Model(n_mels)
+    n_hidden_listen = 38
+    n_hidden_spell = 53
+    model = models.Model(n_mels,
+                         vocab_size,
+                         n_hidden_listen,
+                         n_hidden_spell)
     model.to(device)
 
     for X, y in tqdm.tqdm(train_loader):
         X, y = X.to(device), y.to(device)
 
-        model(X)
+        model(X, y)
 
 def test(args):
     """
