@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# coding: utf-8
 
 # Standard imports
 import os
@@ -123,6 +124,7 @@ def test002():
                                          collate_fn=trim_zero_pad)
 
     waveforms, rate, transcripts = next(iter(loader))
+    print(rate)
 
     win_length = 25  # ms
     win_step = 15  # ms
