@@ -20,10 +20,6 @@ def train(args):
     train_loader, valid_loader, test_loader = data.get_dataloaders(data._DEFAULT_COMMONVOICE_ROOT,
                                                                   n_threads=args.nthreads)
 
-    X, y = next(iter(train_loader))
-    print(X.shape)
-
-
 
 def test(args):
     """
