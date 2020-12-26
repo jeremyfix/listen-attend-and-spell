@@ -7,6 +7,7 @@ import argparse
 # External imports
 # Local imports
 import data
+import models
 
 
 def train(args):
