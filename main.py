@@ -6,6 +6,7 @@ import logging
 import argparse
 # External imports
 import torch
+from torch.nn.utils.rnn import pad_packed_sequence
 import tqdm
 # Local imports
 import data
@@ -44,7 +45,9 @@ def train(args):
     for X, y in tqdm.tqdm(train_loader):
         X, y = X.to(device), y.to(device)
 
-        model(X, y)
+        packed_logits = model(X, y)
+
+        out_logits, lens_logits = pad_packed_sequence(packed_logits)
 
 def test(args):
     """

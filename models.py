@@ -63,6 +63,11 @@ class EncoderListener(nn.Module):
         Args:
             inputs1 : PackedSequence (batch, time, n_mels)
         """
+        # Note, using packed sequence is computationnally less
+        # expensive but it also makes handling of bidirectionnaly LSTM
+        # easier. If we were to use the unpacked sequences, the LSTM for the
+        # backward direction would first eat the pad tokens
+
         # Forward pass through L1
         # out1 is (batch_size, seq_len, 2*num_hidden)
         packedout1, _ = self.l1(inputs1)
@@ -76,12 +81,11 @@ class EncoderListener(nn.Module):
         packedout3, _ = self.l3(inputs3)
 
         # out3 is (batch_size, seq_len3, 2*num_hidden)
-        #TODO: question, should we again concatenate 2 successive time steps ?
         # the paper says the time scale is downscaled by 2**3
-        # but its Fig1 seems only to imply a downsclae by 2**2 except if 
-        # we also concatenate 2 successive time step from the output of 
-        # the last layer ?
-        return packedout3
+        # but its Fig1 seems only to imply a downsclae by 2**2 except if
+        # we also concatenate 2 successive time step from the output of
+        # the last layer which is what we do below
+        return self.downscale_pack(packedout3)
 
 
 class Decoder(nn.Module):
@@ -150,15 +154,18 @@ class Decoder(nn.Module):
         h0 = self.encoder_to_hidden(encoder_features).unsqueeze(dim=0)
         c0 = torch.zeros_like(h0)
         packedout_rnn, _ = self.rnn(packed_embedded, (h0, c0))
-        print(packedout_rnn)
 
         unpacked_out, lens_out = pad_packed_sequence(packedout_rnn,
                                                      batch_first=True)
-        print(unpacked_out.shape)
 
         # Compute the logits over the vocabulary
+        # outchar is (batch_size, seq_len, vocab_size)
         outchar = self.charlin(unpacked_out)
-        #TODO: wip
+
+        return pack_padded_sequence(outchar,
+                                    batch_first=True,
+                                    enforce_sorted=False,
+                                    lengths=lens_targets)
 
 class AttendAndSpell(nn.Module):
 
@@ -233,7 +240,7 @@ class Model(nn.Module):
         super(Model, self).__init__()
         self.listener = EncoderListener(n_mels, num_hidden_listen)
         self.decoder = Decoder(vocab_size,
-                               2*num_hidden_listen,
+                               4*num_hidden_listen,
                                dim_embed,
                                num_hidden_spell)
         # self.attend_and_spell = AttendAndSpell(vocab_size,
@@ -249,3 +256,4 @@ class Model(nn.Module):
         out_listen = self.listener(inputs)
         out_decoder = self.decoder(out_listen, gt_outputs)
         # out_attend_and_spell = self.attend_and_spell(out_listen, gt_outputs)
+        return out_decoder
