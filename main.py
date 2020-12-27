@@ -19,10 +19,12 @@ def train(args):
     logger = logging.getLogger(__name__)
     logger.info("Training")
 
-    device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+    use_cuda = torch.cuda.is_available()
+    device = torch.device('cuda') if use_cuda else torch.device('cpu')
 
     # Data loading
     train_loader, valid_loader, test_loader = data.get_dataloaders(data._DEFAULT_COMMONVOICE_ROOT,
+                                                                   cuda=use_cuda,
                                                                   n_threads=args.nthreads)
     # We need the char map to know about the vocabulary size
     charmap = data.CharMap()

@@ -231,7 +231,7 @@ if __name__ == '__main__':
     train_loader, valid_loader, test_loader = get_dataloaders(_DEFAULT_COMMONVOICE_ROOT,
                                                               cuda=False,
                                                               n_threads=4,
-                                                             batch_size=10)
+                                                              batch_size=10)
 
     X, y = next(iter(train_loader))
     X, lens_X = pad_packed_sequence(X, batch_first=True)

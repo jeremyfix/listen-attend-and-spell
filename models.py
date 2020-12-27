@@ -4,6 +4,7 @@
 # External imports
 import torch
 import torch.nn as nn
+from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
 
 class EncoderListener(nn.Module):
@@ -32,55 +33,43 @@ class EncoderListener(nn.Module):
                           bidirectional=True,
                           batch_first=True)
 
+    def downscale_pack(self, packed_sequence):
+        """
+        Concatenate the features of two consecutive time steps
+        Args:
+            packed_sequence (PackedSequence) batch_first
+        """
+        unpacked, lens = pad_packed_sequence(packed_sequence,
+                                             batch_first=True)
+        # unpackaged is (batch_size, seq_len, num_features)
+        batch_size, seq_len, num_features = unpacked.shape
+
+        if seq_len % 2 != 0:
+            unpacked = unpacked[:, :-1, :]
+            lens[lens == seq_len] = seq_len - 1
+        lens = lens // 2
+        unpacked = unpacked.reshape(batch_size, seq_len//2, 2*num_features)
+        # repack the sequences
+        return pack_padded_sequence(unpacked,
+                                   lengths=lens,
+                                   batch_first=True)
+
     def forward(self, inputs1):
         """
         Args:
-            inputs : (batch, num_mels, time)
+            inputs1 : PackedSequence (batch, time, n_mels)
         """
-        #TODO: we should be using pack_padded and pad_packed
-        # this requires to get the shapes from the dataloaders
-
-        # Get the device to create tensors on the same
-        device = inputs1.device
-
-        # Transpose the inputs to be (batch, time, num_mels)
-        inputs1 = inputs1.permute(0, 2, 1)
-        batch_size, seq_len, num_mels = inputs1.shape
-
-        # The initial hidden and cell states
-        h0 = torch.zeros(2, batch_size, self.num_hidden,
-                         device=device,
-                         requires_grad=False)
-        c0 = torch.zeros(2, batch_size, self.num_hidden,
-                         device=device,
-                         requires_grad=False)
-
+        # Forward pass through L1
         # out1 is (batch_size, seq_len, 2*num_hidden)
-        out1, _ = self.l1(inputs1, (h0, c0))
+        packedout1, _ = self.l1(inputs1)
 
-        # Only keep an even number of time slices
-        if seq_len % 2 != 0:
-            out1 = out1[:, :-1, :]
-            seq_len = seq_len - 1
-
-        # Concatenate two consecutive time steps for feeding in the next
-        # layer
-        # inputs2 is (batch_size, seq_len//2, 2*num_hidden)
-        inputs2 = out1.reshape(batch_size, seq_len//2, 4*self.num_hidden)
-        seq_len = seq_len//2
         # Forward pass through L2
-        out2, _ = self.l2(inputs2, (h0, c0))
+        inputs2 = self.downscale_pack(packedout1)
+        packedout2, _ = self.l2(inputs2)
 
-        if seq_len % 2 != 0:
-            out2 = out2[:, :-1, :]
-            seq_len = seq_len - 1
-        # Concatenate two consecutive time steps for feeding in the next
-        # layer
-        # inputs2 is (batch_size, seq_len//2, 2*num_hidden)
-        inputs3 = out2.reshape(batch_size, seq_len//2, 4*self.num_hidden)
-        seq_len = seq_len//2
         # Forward pass through L2
-        out3, _ = self.l3(inputs3, (h0, c0))
+        inputs3 = self.downscale_pack(packedout2)
+        packedout3, _ = self.l3(inputs3)
 
         # out3 is (batch_size, seq_len3, 2*num_hidden)
         #TODO: question, should we again concatenate 2 successive time steps ?
@@ -88,7 +77,7 @@ class EncoderListener(nn.Module):
         # but its Fig1 seems only to imply a downsclae by 2**2 except if 
         # we also concatenate 2 successive time step from the output of 
         # the last layer ?
-        return out3
+        return packedout3
 
 
 class Decoder(nn.Module):
