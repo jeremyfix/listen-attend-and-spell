@@ -155,7 +155,6 @@ class BatchCollate(object):
         waveforms_lengths = [w.shape[1] for w in waveforms]
         spectro_lengths = [wl//self.nstep+1 for wl in waveforms_lengths]
         transcripts_lengths = [t.shape[0] for t in transcripts]
-        print(transcripts_lengths)
 
         # Pad the waveforms to the longest waveform
         # so that we can process them as a batch through the transform
@@ -163,11 +162,14 @@ class BatchCollate(object):
                                  batch_first=True)
 
         spectrograms = self.transform(waveforms)
-
+        # spectrograms is (B, n_mel, Tx)
+        # we permute it to be (B, Tx, n_mel)
+        spectrograms = spectrograms.permute(0, 2, 1)
         spectrograms = pack_padded_sequence(spectrograms,
                                             lengths=spectro_lengths,
                                             batch_first=True)
 
+        # transcripts is (B, Ty)
         transcripts = pad_sequence(transcripts,
                                    batch_first=True)
         transcripts = pack_padded_sequence(transcripts,
@@ -184,6 +186,7 @@ class BatchCollate(object):
 
 
 def get_dataloaders(commonvoice_root: str,
+                    cuda: bool,
                     batch_size: int = 64,
                     n_threads: int = 4):
     """
@@ -206,32 +209,37 @@ def get_dataloaders(commonvoice_root: str,
                                                batch_size=batch_size,
                                                shuffle=True,
                                                num_workers=n_threads,
-                                               collate_fn=batch_collate_fn)
+                                               collate_fn=batch_collate_fn,
+                                               pin_memory=cuda)
     valid_loader = torch.utils.data.DataLoader(valid_dataset,
                                                batch_size=batch_size,
                                                shuffle=False,
                                                num_workers=n_threads,
-                                               collate_fn=batch_collate_fn)
+                                               collate_fn=batch_collate_fn,
+                                               pin_memory=cuda)
     test_loader = torch.utils.data.DataLoader(test_dataset,
                                               batch_size=batch_size,
                                               shuffle=False,
                                               num_workers=n_threads,
-                                              collate_fn=batch_collate_fn)
+                                              collate_fn=batch_collate_fn,
+                                              pin_memory=cuda)
 
     return train_loader, valid_loader, test_loader
 
 if __name__ == '__main__':
     # Data loading
     train_loader, valid_loader, test_loader = get_dataloaders(_DEFAULT_COMMONVOICE_ROOT,
+                                                              cuda=False,
                                                               n_threads=4,
                                                              batch_size=10)
 
     X, y = next(iter(train_loader))
+    X, lens_X = pad_packed_sequence(X, batch_first=True)
+    y, lens_y = pad_packed_sequence(y, batch_first=True)
     print(X.shape)
-    print(y)
     charmap = CharMap()
-    for yi in y:
-        print(charmap.decode(yi))
+    for yi, li in zip(y, lens_y):
+        print(charmap.decode(yi)[:li])
 
     print(charmap.decode(charmap.encode("nous sommes heureux de vous souhaiter nos meilleurs vœux pour 2015")))
     print('œ' in charmap.char2idx)
