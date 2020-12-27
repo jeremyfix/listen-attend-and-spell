@@ -9,6 +9,8 @@ import torch
 import torch.optim as optim
 from torch.nn.utils.rnn import pad_packed_sequence
 import tqdm
+from deepcs.training import train as train_epoch
+from deepcs.testing import test
 # Local imports
 import data
 import models
@@ -33,9 +35,9 @@ def train(args):
     vocab_size = charmap.vocab_size
 
     n_mels = data._DEFAULT_NUM_MELS
-    n_hidden_listen = 38
-    n_hidden_spell = 53
-    dim_embed = 100
+    n_hidden_listen = 256
+    n_hidden_spell = 256
+    dim_embed = 128
     model = models.Model(n_mels,
                          vocab_size,
                          n_hidden_listen,
@@ -47,16 +49,12 @@ def train(args):
     celoss = models.PackedCELoss()
     optimizer = optim.AdamW(model.parameters())
 
-    for X, y in tqdm.tqdm(train_loader):
-        X, y = X.to(device), y.to(device)
+    metrics = {
+        'CE': celoss
+    }
 
-        packed_logits = model(X, y)
-
-        loss = celoss(packed_logits, y)
-
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
+    train_epoch(model, train_loader, celoss, optimizer, device, metrics,
+               num_model_args=2)
 
 def test(args):
     """
