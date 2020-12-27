@@ -12,9 +12,6 @@ from torch.nn.utils.rnn import pad_sequence
 import torch.utils.data
 from torchaudio.datasets import COMMONVOICE
 from torchaudio.transforms import Spectrogram, AmplitudeToDB, MelScale, MelSpectrogram
-# Download the tokenizer
-import nltk
-nltk.download('punkt')
 
 _DEFAULT_COMMONVOICE_ROOT = "/opt/Datasets/CommonVoice/fr_79h_2019-02-25/fr"
 _DEFAULT_RATE = 48000  # Hz

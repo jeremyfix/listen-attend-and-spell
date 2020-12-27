@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 
 
-class Listener(nn.Module):
+class EncoderListener(nn.Module):
 
     def __init__(self,
                  n_mels: int,
@@ -16,7 +16,7 @@ class Listener(nn.Module):
             n_mels (int) : number of input mel scales
             num_hidden (int): number of LSTM cells per layer and per direction
         """
-        super(Listener, self).__init__()
+        super(EncoderListener, self).__init__()
         self.num_hidden = num_hidden
         # Pyramidal Bidirectionnal LSTM
         self.l1 = nn.LSTM(n_mels,
@@ -37,6 +37,9 @@ class Listener(nn.Module):
         Args:
             inputs : (batch, num_mels, time)
         """
+        #TODO: we should be using pack_padded and pad_packed
+        # this requires to get the shapes from the dataloaders
+
         # Get the device to create tensors on the same
         device = inputs1.device
 
@@ -88,21 +91,76 @@ class Listener(nn.Module):
         return out3
 
 
+class Decoder(nn.Module):
+    """
+    Simple decoder with the Seq2Seq like architecture
+    see [Sutskever et al(2014)]
+    """
+
+    def __init__(self,
+                 vocab_size: int,
+                 num_inputs: int,
+                 dim_embed: int,
+                 num_hidden: int):
+        super(Decoder, self).__init__()
+        self.vocab_size = vocab_size
+        self.num_inputs = num_inputs
+        self.dim_embed = dim_embed
+        self.num_hidden = num_hidden
+
+        # An embedding layer for processing the grounth truth characters
+        # Note: can be initialized from one-hot
+        self.embed = nn.Embedding(vocab_size, dim_embed)
+
+        # A linear layer for projecting the encoder features to the 
+        # initial hidden state of the LSTM
+        self.encoder_to_hidden = nn.Linear(num_inputs, self.num_hidden)
+
+        # The decoder RNN
+        self.rnn = nn.LSTM(dim_embed,
+                           self.num_hidden,
+                           batch_first=True)
+
+        # The linear linear before the softmax
+        self.charlin = nn.Linear(self.num_hidden, self.vocab_size)
+
+    def forward(self, encoder_features, gt_outputs):
+        """
+        encoder_features: (seq_len, batch_size, num_encoder_features)
+        gt_outputs : (batch_size, seq_len)
+        outputs : (seq_len, batch_size, vocab_size)
+        """
+
+        # Forward propagate the ground truth through the input embedding
+        #TODO: we could stop propagating before the <EOS> token
+        embedded_gt = self.embed(gt_outputs)
+
+        # Use the last encoder_features to compute the initial hidden
+        # state of the decoder
+        self.encoder_to_hidden(encoder_features)
+        #TODO
+
 class AttendAndSpell(nn.Module):
 
     def __init__(self,
                  vocab_size: int,
                  num_inputs: int,
+                 dim_embed: int,
                  num_hidden: int):
         """
         Args:
             vocab_size: the number of output characters
             num_inputs: the number of inputs from the previous layer
+            dim_embed (int) : the size of the input embedding
             num_hidden (int) : The number of LSTM cells per layer
         """
         super(AttendAndSpell, self).__init__()
         self.num_inputs = num_inputs
         self.vocab_size = vocab_size
+
+        # An embedding layer for processing the grounth truth characters
+        # Note: can be initialized from one-hot
+        self.embed = nn.Embedding(vocab_size, dim_embed)
 
         # The first LSTM layer
         self.L1 = nn.LSTM(num_inputs,
@@ -115,9 +173,9 @@ class AttendAndSpell(nn.Module):
         #          https://github.com/Alexander-H-Liu/End-to-end-ASR-Pytorch/blob/master/src/asr.py
 
 
-    def forward(self, inputs, gt_outputs):
+    def forward(self, encoder_features, gt_outputs):
         """
-        inputs: (seq_len, batch_size, num_features)
+        encoder_features: (seq_len, batch_size, num_features)
         gt_outputs : (batch_size, seq_len)
         outputs : (seq_len, batch_size, vocab_size)
         """
@@ -127,7 +185,11 @@ class AttendAndSpell(nn.Module):
         # time step
         seq_len, batch_size, num_features = inputs.shape
 
+        # During training, we use the ground truth labels for input
+        # forcing
+        char_embeddings = self.embed(gt_outputs)
 
+        #TODO
 
 
 class Model(nn.Module):
@@ -136,6 +198,7 @@ class Model(nn.Module):
                  n_mels: int,
                  vocab_size: int,
                  num_hidden_listen: int,
+                 dim_embed: int,
                  num_hidden_spell: int):
         """
         Args:
@@ -143,14 +206,20 @@ class Model(nn.Module):
             vocab_size (int) The size of the vocabulary
             num_hidden_listen(int): The number of LSTM cells per layer, per
                                     direction for the listen module
+            dim_embed(int): The size of the embedding for the Spell module
             num_hidden_spell(int): The number of LSTM cells per layer for
                                    the spell module
         """
         super(Model, self).__init__()
-        self.listener = Listener(n_mels, num_hidden_listen)
-        self.attend_and_spell = AttendAndSpell(vocab_size,
-                                               2*num_hidden_listen,
-                                               num_hidden_spell)
+        self.listener = EncoderListener(n_mels, num_hidden_listen)
+        self.decoder = Decoder(vocab_size,
+                               2*num_hidden_listen,
+                               dim_embed,
+                               num_hidden_spell)
+        # self.attend_and_spell = AttendAndSpell(vocab_size,
+        #                                        2*num_hidden_listen,
+        #                                        dim_embed,
+        #                                        num_hidden_spell)
 
     def forward(self, inputs, gt_outputs):
         """
@@ -158,4 +227,5 @@ class Model(nn.Module):
         gt_outputs: (batch_size, time)
         """
         out_listen = self.listener(inputs)
-        out_attend_and_spell = self.attend_and_spell(out_listen, gt_outputs)
+        out_decoder = self.decoder(out_listen, gt_outputs)
+        # out_attend_and_spell = self.attend_and_spell(out_listen, gt_outputs)

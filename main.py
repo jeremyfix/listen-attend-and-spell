@@ -31,9 +31,11 @@ def train(args):
     n_mels = data._DEFAULT_NUM_MELS
     n_hidden_listen = 38
     n_hidden_spell = 53
+    dim_embed = 100
     model = models.Model(n_mels,
                          vocab_size,
                          n_hidden_listen,
+                         dim_embed,
                          n_hidden_spell)
     model.to(device)
 
