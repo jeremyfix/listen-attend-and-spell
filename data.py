@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Union
 # External imports
 import torch.nn as nn
-from torch.nn.utils.rnn import pad_sequence
+from torch.nn.utils.rnn import pad_sequence, pack_padded_sequence, pad_packed_sequence
 import torch.utils.data
 from torchaudio.datasets import COMMONVOICE
 from torchaudio.transforms import Spectrogram, AmplitudeToDB, MelScale, MelSpectrogram
@@ -110,11 +110,13 @@ class BatchCollate(object):
 
     def __init__(self):
         nfft = int(_DEFAULT_WIN_LENGTH * 1e-3 * _DEFAULT_RATE)
-        nstep = int(_DEFAULT_WIN_STEP * 1e-3 * _DEFAULT_RATE)
+        # We need to memorize nstep since it is the downscaling
+        # factor from the waveform to the spectrogram
+        self.nstep = int(_DEFAULT_WIN_STEP * 1e-3 * _DEFAULT_RATE)
         self.transform = nn.Sequential(
             MelSpectrogram(sample_rate=_DEFAULT_RATE,
                            n_fft=nfft,
-                           hop_length=nstep,
+                           hop_length=self.nstep,
                            n_mels=_DEFAULT_NUM_MELS),
             AmplitudeToDB()
         )
@@ -140,17 +142,38 @@ class BatchCollate(object):
                                     self.charmap.eoschar)
             )
             for _, _, d in batch]
-        # Retrieve the maximal length in the list of waveforms
-        # max_len = max([w.shape[1] for w in waveforms])
 
-        # Pad and stack the variable length tensors
-        # waveforms is a 2D tensor (Batch, Time)
+        # Sort the waveforms and transcripts by decreasing waveforms length
+        wt_sorted = sorted(zip(waveforms, transcripts),
+                           key=lambda wr: wr[0].shape[1],
+                           reverse=True)
+        waveforms = [wt[0] for wt in wt_sorted]
+        transcripts = [wt[1] for wt in wt_sorted]
+
+        # Compute the lenghts of the spectrograms from the lengths
+        # of the waveforms
+        waveforms_lengths = [w.shape[1] for w in waveforms]
+        spectro_lengths = [wl//self.nstep+1 for wl in waveforms_lengths]
+        transcripts_lengths = [t.shape[0] for t in transcripts]
+        print(transcripts_lengths)
+
+        # Pad the waveforms to the longest waveform
+        # so that we can process them as a batch through the transform
         waveforms = pad_sequence([t.squeeze() for t in waveforms],
                                  batch_first=True)
 
         spectrograms = self.transform(waveforms)
 
-        transcripts = pad_sequence(transcripts, batch_first=True)
+        spectrograms = pack_padded_sequence(spectrograms,
+                                            lengths=spectro_lengths,
+                                            batch_first=True)
+
+        transcripts = pad_sequence(transcripts,
+                                   batch_first=True)
+        transcripts = pack_padded_sequence(transcripts,
+                                           lengths=transcripts_lengths,
+                                           enforce_sorted=False,
+                                           batch_first=True)
 
         if len(rates) != 1:
             raise NotImplementedError("Cannot deal with more than 1 sample rate in the data")
