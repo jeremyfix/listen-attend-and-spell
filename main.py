@@ -6,6 +6,7 @@ import logging
 import argparse
 # External imports
 import torch
+import torch.optim as optim
 from torch.nn.utils.rnn import pad_packed_sequence
 import tqdm
 # Local imports
@@ -42,12 +43,20 @@ def train(args):
                          n_hidden_spell)
     model.to(device)
 
+    # Loss, optimizer
+    celoss = models.PackedCELoss()
+    optimizer = optim.AdamW(model.parameters())
+
     for X, y in tqdm.tqdm(train_loader):
         X, y = X.to(device), y.to(device)
 
         packed_logits = model(X, y)
 
-        out_logits, lens_logits = pad_packed_sequence(packed_logits)
+        loss = celoss(packed_logits, y)
+
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
 
 def test(args):
     """
