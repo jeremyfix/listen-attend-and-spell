@@ -6,7 +6,6 @@ import torch
 import torch.nn as nn
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
-
 class EncoderListener(nn.Module):
 
     def __init__(self,
@@ -19,19 +18,20 @@ class EncoderListener(nn.Module):
         """
         super(EncoderListener, self).__init__()
         self.num_hidden = num_hidden
+        self.batch_first = True
         # Pyramidal Bidirectionnal LSTM
         self.l1 = nn.LSTM(n_mels,
                           self.num_hidden,
                           bidirectional=True,
-                          batch_first=True)
+                          batch_first=self.batch_first)
         self.l2 = nn.LSTM(2 * 2 * self.num_hidden,
                           self.num_hidden,
                           bidirectional=True,
-                          batch_first=True)
+                          batch_first=self.batch_first)
         self.l3 = nn.LSTM(2 * 2 * self.num_hidden,
                           self.num_hidden,
                           bidirectional=True,
-                          batch_first=True)
+                          batch_first=self.batch_first)
 
     def downscale_pack(self, packed_sequence):
         """
@@ -40,19 +40,23 @@ class EncoderListener(nn.Module):
             packed_sequence (PackedSequence) batch_first
         """
         unpacked, lens = pad_packed_sequence(packed_sequence,
-                                             batch_first=True)
+                                             batch_first=self.batch_first)
         # unpackaged is (batch_size, seq_len, num_features)
-        batch_size, seq_len, num_features = unpacked.shape
+        if self.batch_first:
+            batch_size, seq_len, num_features = unpacked.shape
 
-        if seq_len % 2 != 0:
-            unpacked = unpacked[:, :-1, :]
-            lens[lens == seq_len] = seq_len - 1
+            if seq_len % 2 != 0:
+                unpacked = unpacked[:, :-1, :]
+                lens[lens == seq_len] = seq_len - 1
+        else:
+            raise NotImplementedError("Cannot process non batch first tensors")
         lens = lens // 2
+        assert(self.batch_first)
         unpacked = unpacked.reshape(batch_size, seq_len//2, 2*num_features)
         # repack the sequences
         return pack_padded_sequence(unpacked,
                                    lengths=lens,
-                                   batch_first=True)
+                                   batch_first=self.batch_first)
 
     def forward(self, inputs1):
         """
@@ -113,21 +117,48 @@ class Decoder(nn.Module):
         # The linear linear before the softmax
         self.charlin = nn.Linear(self.num_hidden, self.vocab_size)
 
-    def forward(self, encoder_features, gt_outputs):
+    def forward(self, packed_features, packed_outputs):
         """
         encoder_features: (seq_len, batch_size, num_encoder_features)
         gt_outputs : (batch_size, seq_len)
         outputs : (seq_len, batch_size, vocab_size)
         """
 
-        # Forward propagate the ground truth through the input embedding
-        #TODO: we could stop propagating before the <EOS> token
-        embedded_gt = self.embed(gt_outputs)
+        unpacked_targets, lens_targets = pad_packed_sequence(packed_outputs,
+                                                            batch_first=True)
+        # Remove the <eos>
+        lens_targets -= 1
+
+        # Forward propagate through the embedding layer
+        # embeddings is (batch_size, Ty, dim_embedding)
+        embeddings = self.embed(unpacked_targets)
+
+        # Pack the result
+        packed_embedded = pack_padded_sequence(embeddings,
+                                               lengths=lens_targets,
+                                               enforce_sorted=False,
+                                               batch_first=True
+                                              )
 
         # Use the last encoder_features to compute the initial hidden
         # state of the decoder
-        self.encoder_to_hidden(encoder_features)
-        #TODO
+        unpacked_features, lens_features = pad_packed_sequence(packed_features,
+                                                              batch_first=True)
+        # unpacked_features is (batch_size, seq_len, num_features)
+        encoder_features = torch.stack([unpacked_features[i, ti-1, :] for i, ti in enumerate(lens_features)], dim=0)
+
+        h0 = self.encoder_to_hidden(encoder_features).unsqueeze(dim=0)
+        c0 = torch.zeros_like(h0)
+        packedout_rnn, _ = self.rnn(packed_embedded, (h0, c0))
+        print(packedout_rnn)
+
+        unpacked_out, lens_out = pad_packed_sequence(packedout_rnn,
+                                                     batch_first=True)
+        print(unpacked_out.shape)
+
+        # Compute the logits over the vocabulary
+        outchar = self.charlin(unpacked_out)
+        #TODO: wip
 
 class AttendAndSpell(nn.Module):
 

@@ -243,3 +243,5 @@ if __name__ == '__main__':
 
     print(charmap.decode(charmap.encode("nous sommes heureux de vous souhaiter nos meilleurs vœux pour 2015")))
     print('œ' in charmap.char2idx)
+
+    print(f"The vocabulary contains {charmap.vocab_size} characters")
