@@ -31,9 +31,26 @@ Computing the spectrogram with a Short Time Fourier Transform (window size of 25
 
 The LAS model outputs the text transcription character by character. In this implementation, dealing with the French language, the transcripts are converted to lower case and the vocabulary is [a-z, 0-9, space , period, comma, apostrophe ]. In addition, all the accents were removed (replaced with the letters without accent), the punctuation was either replaced by a period or a space, the 'œ' and 'ç' were also replaced. See the [data.CharMap](https://github.com/jeremyfix/listen-attend-and-spell/blob/05dc9aa60055b318625e40cec8141fa1fa69054c/data.py#L37) object. 
 
-## Testing the notebooks
+
+## Training
+
+For training with the defaults :
 
 ```
-pipenv install jupyterlab matplotlib torchaudio
-pipenv run jupyter lab
+python3 main.py train
 ```
+
+To see options that can be customized : 
+
+```
+python3 main.py train --help
+```
+
+For debugging purpose, e.g. ensuring the training pipeline works, you can experiment on a small subset of the datasets, using a small model
+
+```
+python3 main.py train --nhidden_spell 8 --nhidden_listen 8 --dim_embed 24 --debug
+```
+
+You can consider invoking `python3 -W ignore ...` since at the time of writing, we otherwise get several UserWarning on deprecated torch.rfft which make the terminal output unreadable.
+
