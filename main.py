@@ -6,17 +6,48 @@ import logging
 import argparse
 # External imports
 import torch
+import torch.nn as nn
 import torch.optim as optim
 from torch.nn.utils.rnn import pad_packed_sequence
 from torch.utils.tensorboard import SummaryWriter
+from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 import tqdm
 import deepcs.display
-from deepcs.training import train as train_epoch
-from deepcs.testing import test
+from deepcs.training import train as ftrain
+from deepcs.testing import test as ftest
 from deepcs.fileutils import generate_unique_logpath
+import deepcs.metrics
 # Local imports
 import data
 import models
+
+def wrap_args(packed_predictions, packed_targets):
+    """
+    Little wraper to drop the first element of the target
+    """
+    # The packed_targets virtualy "contain"
+    #  <sos> c1 c2 c3 c4 .... <eos>
+    # The predictions are expected to predict
+    # c1 c2 c3 ... <eos>
+
+    # Therefore, the targets to predict are in the slice
+    #  targets[i, 1:li]
+    # Which are to be compared with the probabilities in
+    #  predictions[i, :li-1, ...]
+    # predictions, lens_predictions = pad_packed_sequence(packed_predictions,
+    #                                                     batch_first=True)
+    targets, lens_targets = pad_packed_sequence(packed_targets,
+                                                batch_first=True)
+    # Remove the <sos> from the targets
+    targets = targets[:, 1:]
+    lens_targets -= 1
+    # Repack it
+    packed_targets = pack_padded_sequence(targets,
+                                          lengths=lens_targets,
+                                          enforce_sorted=False,
+                                          batch_first=True)
+
+    return packed_predictions.data, packed_targets.data
 
 
 def train(args):
@@ -51,11 +82,14 @@ def train(args):
     model.to(device)
 
     # Loss, optimizer
-    celoss = models.PackedCELoss()
+    baseloss = nn.CrossEntropyLoss()
+    celoss = lambda *args: baseloss(* wrap_args(*args))
+    accuracy = lambda *args: deepcs.metrics.accuracy(* wrap_args(*args))
     optimizer = optim.AdamW(model.parameters())
 
     metrics = {
-        'CE': celoss
+        'CE': celoss,
+        'accuracy': accuracy
     }
 
     # Callbacks
@@ -70,16 +104,44 @@ def train(args):
     tensorboard_writer.add_text("Experiment summary", deepcs.display.htmlize(summary_text))
 
     for e in range(args.num_epochs):
-        train_epoch(model,
-                    train_loader,
-                    celoss,
-                    optimizer,
-                    device,
-                    metrics,
-                    num_model_args=2,
-                    num_epoch=e,
-                    tensorboard_writer=tensorboard_writer)
-        # Compute the metrics on the validation set
+        ftrain(model,
+               train_loader,
+               celoss,
+               optimizer,
+               device,
+               metrics,
+               num_model_args=2,
+               num_epoch=e,
+               tensorboard_writer=tensorboard_writer)
+        # Compute and record the metrics on the validation set
+        valid_metrics = ftest(model,
+                              valid_loader,
+                              device,
+                              metrics,
+                              num_model_args=2)
+        logger.info("[%d/%d] Validation:   Loss : %.3f | Acc : %.3f%%"% (e,
+                                                                         args.num_epochs,
+                                                                         valid_metrics['CE'],
+                                                                         100.*valid_metrics['accuracy']))
+
+        for m_name, m_value in valid_metrics.items():
+            tensorboard_writer.add_scalar(f'metrics/valid_{m_name}',
+                                          m_value,
+                                          e+1)
+        # Compute and record the metrics on the test set
+        test_metrics = ftest(model,
+                             test_loader,
+                             device,
+                             metrics,
+                             num_model_args=2)
+        logger.info("[%d/%d] Test:   Loss : %.3f | Acc : %.3f%%"% (e,
+                                                                   args.num_epochs,
+                                                                   test_metrics['CE'],
+                                                                   100.*test_metrics['accuracy']))
+        for m_name, m_value in test_metrics.items():
+            tensorboard_writer.add_scalar(f'metrics/test_{m_name}',
+                                          m_value,
+                                          e+1)
 
 
 def test(args):

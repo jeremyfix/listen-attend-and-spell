@@ -7,41 +7,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
-class PackedCELoss(nn.Module):
-
-    def __init__(self):
-        super(PackedCELoss, self).__init__()
-        self.base_loss = nn.CrossEntropyLoss()
-
-    def forward(self, packed_predictions, packed_targets):
-        """
-        Args:
-
-        """
-        # The packed_targets virtualy "contain"
-        #  <sos> c1 c2 c3 c4 .... <eos>
-        # The predictions are expected to predict
-        # c1 c2 c3 ... <eos>
-
-        # Therefore, the targets to predict are in the slice
-        #  targets[i, 1:li]
-        # Which are to be compared with the probabilities in
-        #  predictions[i, :li-1, ...]
-        # predictions, lens_predictions = pad_packed_sequence(packed_predictions,
-        #                                                     batch_first=True)
-        targets, lens_targets = pad_packed_sequence(packed_targets,
-                                                    batch_first=True)
-        # Remove the <sos> from the targets
-        targets = targets[:, 1:]
-        lens_targets -= 1
-        # Repack it
-        packed_targets = pack_padded_sequence(targets,
-                                              lengths=lens_targets,
-                                              enforce_sorted=False,
-                                              batch_first=True)
-
-        return self.base_loss(packed_predictions.data, packed_targets.data)
-
 
 class EncoderListener(nn.Module):
 
