@@ -188,20 +188,33 @@ class BatchCollate(object):
 def get_dataloaders(commonvoice_root: str,
                     cuda: bool,
                     batch_size: int = 64,
-                    n_threads: int = 4):
+                    n_threads: int = 4,
+                    small_experiment:bool = False):
     """
     Build and return the pytorch dataloaders
 
     Args:
         commonvoice_root (str or Path) : the root directory where the dataset
                                          is stored
-        commonvoice_version (str or Path): the subdirectory
+        cuda (bool) : whether to use cuda or not. Used for creating tensors
+                      on the right device
+        batch_size (int) : the number of samples per minibatch
+        n_threads (int) : the number of threads to use for dataloading
+        small (bool) : whether or not to use small subsets, usefull for debug
     """
     dataset_loader = functools.partial(load_dataset,
                                        commonvoice_root=commonvoice_root)
     train_dataset = dataset_loader("train")
     valid_dataset = dataset_loader("dev")
     test_dataset = dataset_loader("test")
+    if small_experiment:
+        indices = range(3*batch_size)
+        train_dataset = torch.utils.data.Subset(train_dataset,
+                                                indices=indices)
+        valid_dataset = torch.utils.data.Subset(valid_dataset,
+                                                indices=indices)
+        test_dataset = torch.utils.data.Subset(test_dataset,
+                                               indices=indices)
 
     batch_collate_fn = BatchCollate()
 
