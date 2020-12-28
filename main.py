@@ -22,6 +22,7 @@ import deepcs.metrics
 import data
 import models
 
+
 def wrap_args(packed_predictions, packed_targets):
     """
     Little wraper to drop the first element of the target
@@ -96,8 +97,8 @@ def train(args):
 
     # Callbacks
     summary_text = "Summary of the model architecture\n"+ \
-                    "=================================\n" + \
-                    f"{deepcs.display.torch_summarize(model)}\n"
+            "=================================\n" + \
+            f"{deepcs.display.torch_summarize(model)}\n"
 
     print(summary_text)
     logdir = generate_unique_logpath('./logs', 'seq2seq')
@@ -107,7 +108,7 @@ def train(args):
 
     model_checkpoint = ModelCheckpoint(model,
                                        os.path.join(logdir, 'best_model.pt'))
-    
+
     # Training loop
     for e in range(args.num_epochs):
         ftrain(model,
@@ -130,7 +131,7 @@ def train(args):
         logger.info("[%d/%d] Validation:   Loss : %.3f | Acc : %.3f%% %s"% (e,
                                                                          args.num_epochs,
                                                                          valid_metrics['CE'],
-                                                                         100.*valid_metrics['accuracy'], 
+                                                                         100.*valid_metrics['accuracy'],
                                                                            "[>> BETTER <<]" if better_model else ""))
 
         for m_name, m_value in valid_metrics.items():
