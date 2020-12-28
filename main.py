@@ -2,6 +2,7 @@
 # coding: utf-8
 
 # Standard imports
+import os
 import logging
 import argparse
 # External imports
@@ -13,7 +14,7 @@ from torch.utils.tensorboard import SummaryWriter
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 import tqdm
 import deepcs.display
-from deepcs.training import train as ftrain
+from deepcs.training import train as ftrain, ModelCheckpoint
 from deepcs.testing import test as ftest
 from deepcs.fileutils import generate_unique_logpath
 import deepcs.metrics
@@ -103,6 +104,10 @@ def train(args):
                                        flush_secs=5)
     tensorboard_writer.add_text("Experiment summary", deepcs.display.htmlize(summary_text))
 
+    model_checkpoint = ModelCheckpoint(model,
+                                       os.path.join(logdir, 'best_model.pt'))
+    
+    # Training loop
     for e in range(args.num_epochs):
         ftrain(model,
                train_loader,
@@ -113,16 +118,19 @@ def train(args):
                num_model_args=2,
                num_epoch=e,
                tensorboard_writer=tensorboard_writer)
+
         # Compute and record the metrics on the validation set
         valid_metrics = ftest(model,
                               valid_loader,
                               device,
                               metrics,
                               num_model_args=2)
-        logger.info("[%d/%d] Validation:   Loss : %.3f | Acc : %.3f%%"% (e,
+        better_model = model_checkpoint.update(valid_metrics['CE'])
+        logger.info("[%d/%d] Validation:   Loss : %.3f | Acc : %.3f%% %s"% (e,
                                                                          args.num_epochs,
                                                                          valid_metrics['CE'],
-                                                                         100.*valid_metrics['accuracy']))
+                                                                         100.*valid_metrics['accuracy'], 
+                                                                           "[>> BETTER <<]" if better_model else ""))
 
         for m_name, m_value in valid_metrics.items():
             tensorboard_writer.add_scalar(f'metrics/valid_{m_name}',

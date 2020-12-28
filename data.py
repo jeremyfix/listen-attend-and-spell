@@ -13,7 +13,7 @@ import torch.utils.data
 from torchaudio.datasets import COMMONVOICE
 from torchaudio.transforms import Spectrogram, AmplitudeToDB, MelScale, MelSpectrogram
 
-_DEFAULT_COMMONVOICE_ROOT = "/opt/Datasets/CommonVoice/fr_79h_2019-02-25/fr"
+_DEFAULT_COMMONVOICE_ROOT = "/opt/Datasets/CommonVoice/cv-corpus-1-2019-02-25/fr"
 _DEFAULT_RATE = 48000  # Hz
 _DEFAULT_WIN_LENGTH = 25  # ms
 _DEFAULT_WIN_STEP = 15  # ms
