@@ -285,12 +285,23 @@ class Model(nn.Module):
         #                                        dim_embed,
         #                                        num_hidden_spell)
 
-    def forward(self, inputs, gt_outputs):
+    def forward(self, inputs, gt_outputs=None):
         """
         inputs: (batch_size, num_mels, time)
         gt_outputs: (batch_size, time)
         """
-        out_listen = self.listener(inputs)
-        out_decoder = self.decoder(out_listen, gt_outputs)
-        # out_attend_and_spell = self.attend_and_spell(out_listen, gt_outputs)
-        return out_decoder
+
+        # We assume that
+        #  forward(inputs, gt_outputs) is the propagation during learning
+        #  forward(inputs)             is the propagation during inference
+        if gt_outputs is not None:
+            # Propagation for learning
+            # or for evaluating the probability of the ground truth
+            # transcriptions
+            out_listen = self.listener(inputs)
+            out_decoder = self.decoder(out_listen, gt_outputs)
+            # out_attend_and_spell = self.attend_and_spell(out_listen, gt_outputs)
+            return out_decoder
+        else:
+            # Inference
+            pass
