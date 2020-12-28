@@ -32,7 +32,8 @@ def train(args):
     # Data loading
     train_loader, valid_loader, test_loader = data.get_dataloaders(data._DEFAULT_COMMONVOICE_ROOT,
                                                                    cuda=use_cuda,
-                                                                  n_threads=args.nthreads)
+                                                                   n_threads=args.nthreads,
+                                                                   small_experiment=args.debug)
     # We need the char map to know about the vocabulary size
     charmap = data.CharMap()
     vocab_size = charmap.vocab_size
@@ -101,6 +102,9 @@ if __name__ == '__main__':
                        type=int,
                        help="The number of threads to use for loading the data",
                        default=4)
+    parser.add_argument("--debug",
+                        action="store_true",
+                        help="Whether to test on a small experiment")
     parser.add_argument("--num_epochs",
                         type=int,
                         help="The number of epochs to train for",
