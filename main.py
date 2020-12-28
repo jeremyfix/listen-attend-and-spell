@@ -8,9 +8,12 @@ import argparse
 import torch
 import torch.optim as optim
 from torch.nn.utils.rnn import pad_packed_sequence
+from torch.utils.tensorboard import SummaryWriter
 import tqdm
+import deepcs.display
 from deepcs.training import train as train_epoch
 from deepcs.testing import test
+from deepcs.fileutils import generate_unique_logpath
 # Local imports
 import data
 import models
@@ -54,8 +57,29 @@ def train(args):
         'CE': celoss
     }
 
-    train_epoch(model, train_loader, celoss, optimizer, device, metrics,
-               num_model_args=2)
+    # Callbacks
+    summary_text = "Summary of the model architecture\n"+ \
+                    "=================================\n" + \
+                    f"{deepcs.display.torch_summarize(model)}\n"
+
+    print(summary_text)
+    logdir = generate_unique_logpath('./logs', 'seq2seq')
+    tensorboard_writer = SummaryWriter(log_dir = logdir,
+                                       flush_secs=5)
+    tensorboard_writer.add_text("Experiment summary", deepcs.display.htmlize(summary_text))
+
+    for e in range(args.num_epochs):
+        train_epoch(model,
+                    train_loader,
+                    celoss,
+                    optimizer,
+                    device,
+                    metrics,
+                    num_model_args=2,
+                    num_epoch=e,
+                    tensorboard_writer=tensorboard_writer)
+        # Compute the metrics on the validation set
+
 
 def test(args):
     """
@@ -77,6 +101,10 @@ if __name__ == '__main__':
                        type=int,
                        help="The number of threads to use for loading the data",
                        default=4)
+    parser.add_argument("--num_epochs",
+                        type=int,
+                        help="The number of epochs to train for",
+                        default=10)
 
     parser.add_argument("--nhidden_listen",
                         type=int,
