@@ -100,7 +100,8 @@ def train(args):
             "=================================\n" + \
             f"{deepcs.display.torch_summarize(model)}\n"
 
-    print(summary_text)
+    logger.info(summary_text)
+
     logdir = generate_unique_logpath('./logs', 'seq2seq')
     tensorboard_writer = SummaryWriter(log_dir = logdir,
                                        flush_secs=5)
@@ -152,6 +153,11 @@ def train(args):
             tensorboard_writer.add_scalar(f'metrics/test_{m_name}',
                                           m_value,
                                           e+1)
+
+        # Try to decode some of the validation samples
+
+        # And save them to the tensorboard
+
 
 
 def test(args):
