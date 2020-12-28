@@ -34,10 +34,11 @@ def train(args):
     charmap = data.CharMap()
     vocab_size = charmap.vocab_size
 
+    # Model definition
     n_mels = data._DEFAULT_NUM_MELS
-    n_hidden_listen = 256
-    n_hidden_spell = 256
-    dim_embed = 128
+    n_hidden_listen = args.nhidden_listen
+    n_hidden_spell = args.nhidden_spell
+    dim_embed = args.dim_embed
     model = models.Model(n_mels,
                          vocab_size,
                          n_hidden_listen,
@@ -77,6 +78,21 @@ if __name__ == '__main__':
                        help="The number of threads to use for loading the data",
                        default=4)
 
+    parser.add_argument("--nhidden_listen",
+                        type=int,
+                        help="The number of units per recurrent layer of "
+                        "the encoder layer",
+                        default=256)
+    parser.add_argument("--nhidden_spell",
+                        type=int,
+                        help="The number of units per recurrent layer of the "
+                        "spell module",
+                        default=256)
+    parser.add_argument("--dim_embed",
+                        type=int,
+                        help="The dimensionality of the embedding layer "
+                        "for the input characters of the decoder",
+                        default=128)
     args = parser.parse_args()
 
     eval(f"{args.command}(args)")
