@@ -13,7 +13,8 @@ import torch.utils.data
 from torchaudio.datasets import COMMONVOICE
 from torchaudio.transforms import Spectrogram, AmplitudeToDB, MelScale, MelSpectrogram
 
-_DEFAULT_COMMONVOICE_ROOT = "/opt/Datasets/CommonVoice/cv-corpus-1-2019-02-25/fr"
+_DEFAULT_COMMONVOICE_ROOT = "/opt/Datasets/CommonVoice/"
+_DEFAULT_COMMONVOICE_VERSION = "v1"
 _DEFAULT_RATE = 48000  # Hz
 _DEFAULT_WIN_LENGTH = 25  # ms
 _DEFAULT_WIN_STEP = 15  # ms
@@ -21,7 +22,8 @@ _DEFAULT_NUM_MELS = 40
 
 
 def load_dataset(fold: str,
-                 commonvoice_root: Union[str, Path]) -> torch.utils.data.Dataset:
+                 commonvoice_root: Union[str, Path],
+                 commonvoice_version: str) -> torch.utils.data.Dataset:
     """
     Load the commonvoice dataset
 
@@ -31,7 +33,8 @@ def load_dataset(fold: str,
     Returns:
         torch.utils.data.Dataset: ``dataset``
     """
-    return COMMONVOICE(root=commonvoice_root,
+    datasetpath = os.path.join(commonvoice_root, commonvoice_version, 'fr')
+    return COMMONVOICE(root=datasetpath,
                        tsv=fold+".tsv")
 
 
@@ -186,6 +189,7 @@ class BatchCollate(object):
 
 
 def get_dataloaders(commonvoice_root: str,
+                    commonvoice_version: str,
                     cuda: bool,
                     batch_size: int = 64,
                     n_threads: int = 4,
@@ -196,6 +200,7 @@ def get_dataloaders(commonvoice_root: str,
     Args:
         commonvoice_root (str or Path) : the root directory where the dataset
                                          is stored
+        commonvoice_version (str) : the version of the dataset to consider, e.g. 1, 6.1, ..
         cuda (bool) : whether to use cuda or not. Used for creating tensors
                       on the right device
         batch_size (int) : the number of samples per minibatch
@@ -203,7 +208,8 @@ def get_dataloaders(commonvoice_root: str,
         small (bool) : whether or not to use small subsets, usefull for debug
     """
     dataset_loader = functools.partial(load_dataset,
-                                       commonvoice_root=commonvoice_root)
+                                       commonvoice_root=commonvoice_root,
+                                       commonvoice_version=commonvoice_version)
     train_dataset = dataset_loader("train")
     valid_dataset = dataset_loader("dev")
     test_dataset = dataset_loader("test")
@@ -242,6 +248,7 @@ def get_dataloaders(commonvoice_root: str,
 if __name__ == '__main__':
     # Data loading
     train_loader, valid_loader, test_loader = get_dataloaders(_DEFAULT_COMMONVOICE_ROOT,
+                                                              _DEFAULT_COMMONVOICE_VERSION,
                                                               cuda=False,
                                                               n_threads=4,
                                                               batch_size=10)

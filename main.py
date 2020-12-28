@@ -62,7 +62,8 @@ def train(args):
     device = torch.device('cuda') if use_cuda else torch.device('cpu')
 
     # Data loading
-    train_loader, valid_loader, test_loader = data.get_dataloaders(data._DEFAULT_COMMONVOICE_ROOT,
+    train_loader, valid_loader, test_loader = data.get_dataloaders(args.datasetroot,
+                                                                   args.datasetversion,
                                                                    cuda=use_cuda,
                                                                    n_threads=args.nthreads,
                                                                    small_experiment=args.debug)
@@ -168,6 +169,17 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("command",
                         choices=['train', 'test'])
+    parser.add_argument("--datasetversion",
+                        choices=['v1', 'v6.1'],
+                        default=data._DEFAULT_COMMONVOICE_VERSION,
+                        help="Which CommonVoice corpus to consider")
+    parser.add_argument("--datasetroot",
+                        type=str,
+                        default=data._DEFAULT_COMMONVOICE_ROOT,
+                        help="The root directory holding the datasets. "
+                        " These are supposed to be datasetroot/v1/fr or "
+                        " datasetroot/v6.1/fr"
+                       )
     parser.add_argument("--nthreads",
                        type=int,
                        help="The number of threads to use for loading the data",
