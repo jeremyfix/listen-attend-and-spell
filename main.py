@@ -3,8 +3,10 @@
 
 # Standard imports
 import os
+import sys
 import logging
 import argparse
+from pathlib import Path
 # External imports
 import torch
 import torch.nn as nn
@@ -73,7 +75,7 @@ def train(args):
     vocab_size = charmap.vocab_size
 
     # Model definition
-    n_mels = data._DEFAULT_NUM_MELS
+    n_mels = args.nmels
     n_hidden_listen = args.nhidden_listen
     n_hidden_spell = args.nhidden_spell
     dim_embed = args.dim_embed
@@ -96,9 +98,11 @@ def train(args):
     }
 
     # Callbacks
-    summary_text = "Summary of the model architecture\n"+ \
-            "=================================\n" + \
+    summary_text = "## Summary of the model architecture\n"+ \
             f"{deepcs.display.torch_summarize(model)}\n"
+    summary_text += "\n\n## Executed command :\n" +\
+        "{}".format(" ".join(sys.argv))
+    summary_text += "\n\n## Args : \n {}".format(args)
 
     logger.info(summary_text)
 
@@ -106,6 +110,9 @@ def train(args):
     tensorboard_writer = SummaryWriter(log_dir = logdir,
                                        flush_secs=5)
     tensorboard_writer.add_text("Experiment summary", deepcs.display.htmlize(summary_text))
+
+    with open(os.path.join(logdir, "summary.txt"), 'w') as f:
+        f.write(summary_text)
 
     model_checkpoint = ModelCheckpoint(model,
                                        os.path.join(logdir, 'best_model.pt'))
@@ -198,7 +205,10 @@ if __name__ == '__main__':
                         type=int,
                         help="The number of epochs to train for",
                         default=10)
-
+    parser.add_argument("--nmels",
+                        type=int,
+                        help="The number of scales in the MelSpectrogram",
+                        default=data._DEFAULT_NUM_MELS)
     parser.add_argument("--nhidden_listen",
                         type=int,
                         help="The number of units per recurrent layer of "
