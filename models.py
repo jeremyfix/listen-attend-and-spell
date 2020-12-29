@@ -223,7 +223,7 @@ class Decoder(nn.Module):
         # - their log probabilities
         # - the hidden and cell states they had
         # We need all these to go on expanding the tree for decoding
-        sequences = [[0.0, [charmap.encode(charmap.soschar)], (h0, c0)]]
+        sequences = [[0.0, charmap.encode(charmap.soschar), (h0, c0)]]
 
         for ti in range(maxlength):
 
