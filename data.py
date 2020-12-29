@@ -10,12 +10,13 @@ from typing import Union
 import torch.nn as nn
 from torch.nn.utils.rnn import pad_sequence, pack_padded_sequence, pad_packed_sequence
 import torch.utils.data
+import torchaudio
 from torchaudio.datasets import COMMONVOICE
 from torchaudio.transforms import Spectrogram, AmplitudeToDB, MelScale, MelSpectrogram
 
 _DEFAULT_COMMONVOICE_ROOT = "/opt/Datasets/CommonVoice/"
 _DEFAULT_COMMONVOICE_VERSION = "v1"
-_DEFAULT_RATE = 48000  # Hz
+_DEFAULT_RATE = 44000  # Hz
 _DEFAULT_WIN_LENGTH = 25  # ms
 _DEFAULT_WIN_STEP = 15  # ms
 _DEFAULT_NUM_MELS = 40
@@ -174,6 +175,10 @@ class BatchCollate(object):
             )
             for _, _, d in batch]
 
+        if len(rates) != 1:
+            # We resample the signal to the _DEFAULT_RATE
+            waveforms = [torchaudio.transforms.Resample(r, _DEFAULT_RATE)(w) if r != _DEFAULT_RATE else w for w, r in zip(waveforms, rates)]
+
         # Sort the waveforms and transcripts by decreasing waveforms length
         wt_sorted = sorted(zip(waveforms, transcripts),
                            key=lambda wr: wr[0].shape[1],
@@ -205,11 +210,6 @@ class BatchCollate(object):
                                            enforce_sorted=False,
                                            batch_first=True)
 
-        if len(rates) != 1:
-            raise NotImplementedError("Cannot deal with more than 1 sample rate in the data")
-        if rates.pop() != _DEFAULT_RATE:
-            raise NotImplementedError("One batch is using a sampling rate different"
-                                      f" from the assumed {self._DEFAULT_RATE} Hz")
         return spectrograms, transcripts
 
 
