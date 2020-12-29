@@ -5,14 +5,14 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
+from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence, PackedSequence
 
 
 class EncoderListener(nn.Module):
 
     def __init__(self,
                  n_mels: int,
-                 num_hidden: int):
+                 num_hidden: int) -> None:
         """
         Args:
             n_mels (int) : number of input mel scales
@@ -35,7 +35,8 @@ class EncoderListener(nn.Module):
                           bidirectional=True,
                           batch_first=self.batch_first)
 
-    def downscale_pack(self, packed_sequence):
+    def downscale_pack(self,
+                       packed_sequence: PackedSequence) -> PackedSequence:
         """
         Concatenate the features of two consecutive time steps
         Args:
@@ -57,13 +58,16 @@ class EncoderListener(nn.Module):
         unpacked = unpacked.reshape(batch_size, seq_len//2, 2*num_features)
         # repack the sequences
         return pack_padded_sequence(unpacked,
-                                   lengths=lens,
-                                   batch_first=self.batch_first)
+                                    lengths=lens,
+                                    batch_first=self.batch_first)
 
-    def forward(self, inputs1):
+    def forward(self,
+                inputs1: PackedSequence) -> PackedSequence:
         """
         Args:
             inputs1 : PackedSequence (batch, time, n_mels)
+        Returns:
+            packed_features : PackedSequence (batch, time//2**3, 2*num_hidden)
         """
         # Note, using packed sequence is computationnally less
         # expensive but it also makes handling of bidirectionnaly LSTM
@@ -100,7 +104,7 @@ class Decoder(nn.Module):
                  vocab_size: int,
                  num_inputs: int,
                  dim_embed: int,
-                 num_hidden: int):
+                 num_hidden: int) -> None:
         super(Decoder, self).__init__()
         self.vocab_size = vocab_size
         self.num_inputs = num_inputs
@@ -111,7 +115,7 @@ class Decoder(nn.Module):
         # Note: can be initialized from one-hot
         self.embed = nn.Embedding(vocab_size, dim_embed)
 
-        # A linear layer for projecting the encoder features to the 
+        # A linear layer for projecting the encoder features to the
         # initial hidden state of the LSTM
         self.encoder_to_hidden = nn.Linear(num_inputs, self.num_hidden)
 
@@ -123,15 +127,17 @@ class Decoder(nn.Module):
         # The linear linear before the softmax
         self.charlin = nn.Linear(self.num_hidden, self.vocab_size)
 
-    def forward(self, packed_features, packed_outputs):
+    def forward(self,
+                packed_features: PackedSequence,
+                packed_gt_outputs: PackedSequence) -> PackedSequence:
         """
-        encoder_features: (seq_len, batch_size, num_encoder_features)
-        gt_outputs : (batch_size, seq_len)
-        outputs : (seq_len, batch_size, vocab_size)
+        packed_features: (batch_size, seq_len, num_encoder_features)
+        packed_gt_outputs : (batch_size, seq_len)
+        packed_outputs : (batch_size, seq_len, vocab_size)
         """
 
-        unpacked_targets, lens_targets = pad_packed_sequence(packed_outputs,
-                                                            batch_first=True)
+        unpacked_targets, lens_targets = pad_packed_sequence(packed_gt_outputs,
+                                                             batch_first=True)
         # Remove the <eos>
         lens_targets -= 1
 
@@ -143,13 +149,12 @@ class Decoder(nn.Module):
         packed_embedded = pack_padded_sequence(embeddings,
                                                lengths=lens_targets,
                                                enforce_sorted=False,
-                                               batch_first=True
-                                              )
+                                               batch_first=True)
 
         # Use the last encoder_features to compute the initial hidden
         # state of the decoder
         unpacked_features, lens_features = pad_packed_sequence(packed_features,
-                                                              batch_first=True)
+                                                               batch_first=True)
         # unpacked_features is (batch_size, seq_len, num_features)
         encoder_features = torch.stack([unpacked_features[i, ti-1, :] for i, ti in enumerate(lens_features)], dim=0)
 
@@ -168,6 +173,25 @@ class Decoder(nn.Module):
                                     batch_first=True,
                                     enforce_sorted=False,
                                     lengths=lens_targets)
+
+    def decode(self,
+               beamwidth: int,
+               maxlength: int,
+               packed_features: PackedSequence) -> PackedSequence:
+        """
+        Performs beam search decode of the provided spectrogram
+        Args:
+            beamwidth(int): The number of alternatives to consider
+            maxlength(int): The maximal length of the sequence if no <eos> is
+            predicted
+            packed_features(torch.Tensor): The packed outputs of the encoder
+                                           (batch, seq_len, num_features)
+        Returns:
+            packed_outputs(PackedSequence): The most likely decoded sequences
+                                            (batch, maxlength)
+        """
+        pass
+
 
 class AttendAndSpell(nn.Module):
 
@@ -228,7 +252,7 @@ class Model(nn.Module):
                  vocab_size: int,
                  num_hidden_listen: int,
                  dim_embed: int,
-                 num_hidden_spell: int):
+                 num_hidden_spell: int) -> None:
         """
         Args:
             n_mels (int)  The number of input mel scales
@@ -250,23 +274,41 @@ class Model(nn.Module):
         #                                        dim_embed,
         #                                        num_hidden_spell)
 
-    def forward(self, inputs, gt_outputs=None):
+    def forward(self,
+                inputs: torch.Tensor,
+                gt_outputs: torch.Tensor) -> PackedSequence:
         """
-        inputs: (batch_size, num_mels, time)
-        gt_outputs: (batch_size, time)
+        Args:
+            inputs(torch.Tensor): (batch_size, num_mels, time)
+            gt_outputs(torch.Tensor): (batch_size, time)
         """
 
-        # We assume that
-        #  forward(inputs, gt_outputs) is the propagation during learning
-        #  forward(inputs)             is the propagation during inference
-        if gt_outputs is not None:
-            # Propagation for learning
-            # or for evaluating the probability of the ground truth
-            # transcriptions
-            out_listen = self.listener(inputs)
-            out_decoder = self.decoder(out_listen, gt_outputs)
-            # out_attend_and_spell = self.attend_and_spell(out_listen, gt_outputs)
-            return out_decoder
-        else:
-            # Inference
-            pass
+        # Propagation for learning
+        # or for evaluating the probability of the ground truth
+        # transcriptions
+        out_listen = self.listener(inputs)
+        out_decoder = self.decoder(out_listen, gt_outputs)
+        # out_attend_and_spell = self.attend_and_spell(out_listen, gt_outputs)
+        return out_decoder
+
+    def decode(self,
+               beamwidth: int,
+               maxlength: int,
+               inputs: torch.Tensor) -> PackedSequence:
+        """
+        Performs beam search decode of the provided spectrogram
+        Args:
+            beamwidth(int): The number of alternatives to consider
+            maxlength(int): The maximal length of the sequence if no <eos> is
+                             predicted
+            inputs(torch.Tensor): The input spectrograms
+        Returns:
+            out_decoder(torch.Tensor): The decoded sequences
+        """
+        # Forward propagated through the encoder
+        packed_out_listen = self.listener(inputs)
+        # Performing beam search on the decoder
+        packed_out_decoder = self.decoder.decode(beamwidth,
+                                                 maxlength,
+                                                 packed_out_listen)
+        return packed_out_decoder

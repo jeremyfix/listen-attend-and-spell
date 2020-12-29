@@ -121,6 +121,13 @@ class WaveformProcessor(object):
             AmplitudeToDB()
         )
 
+    def get_spectro_length(self, waveform_length: int):
+        """
+        Computes the length of the spectrogram given the length
+        of the waveform
+        """
+        return waveform_length//self.nstep+1
+
     def __call__(self, waveforms: torch.Tensor):
         """
         Apply the transformation on the input waveform tensor
@@ -130,9 +137,11 @@ class WaveformProcessor(object):
         Args:
             waveforms(torch.Tensor) : (B, Tx) waveform
         Returns:
-            spectrograms(torch.Tensor): (B, n_mel, Tx//nstep + 1)
+            spectrograms(torch.Tensor): (B, Tx//nstep + 1, n_mels)
         """
-        return self.transform(waveforms)
+        # spectrograms is (B, n_mel, Tx)
+        # we permute it to be (B, Tx, n_mel)
+        return self.transform(waveforms).permute(0, 2, 1)
 
 
 class BatchCollate(object):
@@ -175,7 +184,7 @@ class BatchCollate(object):
         # Compute the lenghts of the spectrograms from the lengths
         # of the waveforms
         waveforms_lengths = [w.shape[1] for w in waveforms]
-        spectro_lengths = [wl//self.nstep+1 for wl in waveforms_lengths]
+        spectro_lengths = [self.waveform_processor.get_spectro_length(wl) for wl in waveforms_lengths]
         transcripts_lengths = [t.shape[0] for t in transcripts]
 
         # Pad the waveforms to the longest waveform
@@ -184,9 +193,6 @@ class BatchCollate(object):
                                  batch_first=True)
 
         spectrograms = self.waveform_processor(waveforms)
-        # spectrograms is (B, n_mel, Tx)
-        # we permute it to be (B, Tx, n_mel)
-        spectrograms = spectrograms.permute(0, 2, 1)
         spectrograms = pack_padded_sequence(spectrograms,
                                             lengths=spectro_lengths,
                                             batch_first=True)

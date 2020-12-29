@@ -14,12 +14,15 @@ import torch.optim as optim
 from torch.nn.utils.rnn import pad_packed_sequence
 from torch.utils.tensorboard import SummaryWriter
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
+import torchaudio
 import tqdm
 import deepcs.display
 from deepcs.training import train as ftrain, ModelCheckpoint
 from deepcs.testing import test as ftest
 from deepcs.fileutils import generate_unique_logpath
 import deepcs.metrics
+
+import matplotlib.pyplot as plt
 # Local imports
 import data
 import models
@@ -174,6 +177,60 @@ def test(args):
     logger = logging.getLogger(__name__)
     logger.info("Test")
 
+    use_cuda = torch.cuda.is_available()
+    device = torch.device('cuda') if use_cuda else torch.device('cpu')
+
+    # We need the char map to know about the vocabulary size
+    charmap = data.CharMap()
+    vocab_size = charmap.vocab_size
+
+    # Create the model
+    # It is required to build up the same architecture than the one
+    # used during training. If you do not remember the parameters
+    # check the summary.txt file in the logdir where you have you
+    # modelpath pt file saved
+    n_mels = args.nmels
+    n_hidden_listen = args.nhidden_listen
+    n_hidden_spell = args.nhidden_spell
+    dim_embed = args.dim_embed
+
+    logger.info("Building the model")
+    model = models.Model(n_mels,
+                         vocab_size,
+                         n_hidden_listen,
+                         dim_embed,
+                         n_hidden_spell)
+    model.to(device)
+    model.load_state_dict(torch.load(args.modelpath))
+
+    # Switch the model to eval mode
+    model.eval()
+
+    # Load and preprocess the audiofile
+    logger.info("Loading and preprocessing the audio file")
+    waveform, sample_rate = torchaudio.load(args.audiofile)
+    waveform_processor = data.WaveformProcessor()
+    spectrogram = waveform_processor(waveform)
+    spectro_length = spectrogram.shape[1]
+
+    # Plot the spectrogram
+    logger.info("Plotting the spectrogram")
+    fig = plt.figure()
+    ax = fig.add_subplot()
+    ax.imshow(spectrogram[0].numpy(),
+              aspect='equal', cmap='magma', origin='lower')
+    ax.set_xlabel("Mel scale")
+    ax.set_ylabel("Time (sample)")
+    fig.tight_layout()
+    plt.savefig("spectro_test.png")
+
+    spectrogram = pack_padded_sequence(spectrogram,
+                                       lengths= [spectro_length],
+                                       batch_first=True)
+
+    logger.info("Decoding the spectrogram")
+    model.decode(args.beamwidth, args.maxlength, spectrogram)
+
 
 if __name__ == '__main__':
     logging.basicConfig()
@@ -224,6 +281,24 @@ if __name__ == '__main__':
                         help="The dimensionality of the embedding layer "
                         "for the input characters of the decoder",
                         default=128)
+
+    # For testing/decoding
+    parser.add_argument("--modelpath",
+                        type=Path,
+                        help="The pt path to load")
+    parser.add_argument("--audiofile",
+                        type=Path,
+                        help="The path to the audio file to transcript")
+    parser.add_argument("--beamwidth",
+                       type=int,
+                       help="The number of alternatives to consider when"
+                       " for beam search decoding")
+    parser.add_argument("--maxlength",
+                       type=int,
+                       help="The maximum length of the decoded string if no"
+                       " <eos> is predicted.")
+
+
     args = parser.parse_args()
 
     eval(f"{args.command}(args)")
