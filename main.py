@@ -229,7 +229,8 @@ def test(args):
                                        batch_first=True)
 
     logger.info("Decoding the spectrogram")
-    model.decode(args.beamwidth, args.maxlength, spectrogram, charmap)
+    likely_sequences = model.decode(args.beamwidth, args.maxlength, spectrogram, charmap)
+    print(likely_sequences)
 
 
 if __name__ == '__main__':

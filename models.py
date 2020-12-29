@@ -223,9 +223,15 @@ class Decoder(nn.Module):
         # - their log probabilities
         # - the hidden and cell states they had
         # We need all these to go on expanding the tree for decoding
-        sequences = [[0.0, [charmap.soschar], (h0, c0)]]*beamwidth
+        sequences = [[0.0, [charmap.encode(charmap.soschar)], (h0, c0)]]
 
         for ti in range(maxlength):
+
+            #TODO: there is a bug : 
+            # 1) we need to update the embeddings before looping
+            # 2) we need to propagate, for every considered sequence,
+            #    just the correct embedding
+
             # Compute the embeddings of the input chars
             embeddings = self.embed(input_chars)
             packed_embedded = pack_padded_sequence(embeddings,
@@ -247,7 +253,7 @@ class Decoder(nn.Module):
 
                 # Store all the possible expansions
                 for ci, lpc in enumerate(charlogprobs):
-                    expansions.append((its, ci, prob+lpc))
+                    expansions.append((its, ci, prob+lpc.item()))
                 hidden_states.append((hn, cn))
 
             # Sort the expansions by their conditional probabilities
@@ -260,9 +266,13 @@ class Decoder(nn.Module):
             # by updating "sequences"
             newsequences = []
             for its, ci, newlogprob in expansions_to_keep:
-                #TODO: WIP
-                newsequences.append()
-
+                newprob = newlogprob
+                newseq = sequences[its][1] + [ci]
+                newhidden = hidden_states[its]
+                newsequences.append([newprob, newseq, newhidden])
+            sequences = newsequences
+        # Return the candidates with their logprobabilities
+        return [ (p, charmap.decode(s)) for p, s, _ in sequences ]
 
 class AttendAndSpell(nn.Module):
 
