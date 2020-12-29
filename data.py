@@ -106,10 +106,7 @@ class CharMap(object):
         return "".join([self.idx2char[it] for it in tokens])
 
 
-class BatchCollate(object):
-    """
-    Collator for the individual data to build up the minibatches
-    """
+class WaveformProcessor(object):
 
     def __init__(self):
         nfft = int(_DEFAULT_WIN_LENGTH * 1e-3 * _DEFAULT_RATE)
@@ -123,6 +120,28 @@ class BatchCollate(object):
                            n_mels=_DEFAULT_NUM_MELS),
             AmplitudeToDB()
         )
+
+    def __call__(self, waveforms: torch.Tensor):
+        """
+        Apply the transformation on the input waveform tensor
+        The time dimension is smalled because of the hop_length given
+        to the MelSpectrogram object.
+
+        Args:
+            waveforms(torch.Tensor) : (B, Tx) waveform
+        Returns:
+            spectrograms(torch.Tensor): (B, n_mel, Tx//nstep + 1)
+        """
+        return self.transform(waveforms)
+
+
+class BatchCollate(object):
+    """
+    Collator for the individual data to build up the minibatches
+    """
+
+    def __init__(self):
+        self.waveform_processor = WaveformProcessor()
         self.charmap = CharMap()
 
     def __call__(self, batch):
@@ -164,7 +183,7 @@ class BatchCollate(object):
         waveforms = pad_sequence([t.squeeze() for t in waveforms],
                                  batch_first=True)
 
-        spectrograms = self.transform(waveforms)
+        spectrograms = self.waveform_processor(waveforms)
         # spectrograms is (B, n_mel, Tx)
         # we permute it to be (B, Tx, n_mel)
         spectrograms = spectrograms.permute(0, 2, 1)
