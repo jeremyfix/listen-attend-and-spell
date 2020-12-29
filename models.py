@@ -223,13 +223,13 @@ class Decoder(nn.Module):
         # - their log probabilities
         # - the hidden and cell states they had
         # We need all these to go on expanding the tree for decoding
-        sequences = [ [0.0, [charmap.soschar], (h0, c0)] ]*beamwidth
+        sequences = [[0.0, [charmap.soschar], (h0, c0)]]*beamwidth
 
         for ti in range(maxlength):
             # Compute the embeddings of the input chars
             embeddings = self.embed(input_chars)
             packed_embedded = pack_padded_sequence(embeddings,
-                                                   lengths =[1]*batch_size,
+                                                   lengths=[1]*batch_size,
                                                    batch_first=True)
             # Forward propagate through the LSTM for every alternative
             # and compute the possible expansions for every path
