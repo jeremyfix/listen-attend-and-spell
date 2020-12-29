@@ -6,6 +6,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence, PackedSequence
+# Local imports
+import data
 
 
 class EncoderListener(nn.Module):
@@ -177,8 +179,11 @@ class Decoder(nn.Module):
     def decode(self,
                beamwidth: int,
                maxlength: int,
-               packed_features: PackedSequence) -> PackedSequence:
+               packed_features: PackedSequence,
+               charmap: data.CharMap) -> PackedSequence:
         """
+        Note: cannot handle more than one sample at a time
+
         Performs beam search decode of the provided spectrogram
         Args:
             beamwidth(int): The number of alternatives to consider
@@ -190,7 +195,73 @@ class Decoder(nn.Module):
             packed_outputs(PackedSequence): The most likely decoded sequences
                                             (batch, maxlength)
         """
-        pass
+
+        # Use the last encoder_features to compute the initial hidden
+        # state of the decoder
+        unpacked_features, lens_features = pad_packed_sequence(packed_features,
+                                                               batch_first=True)
+        batch_size, _, _ = unpacked_features.shape
+        if batch_size != 1:
+            raise NotImplementedError("Cannot handle batch size larger than 1")
+
+        # unpacked_features is (batch_size, seq_len, num_features)
+        encoder_features = torch.stack([unpacked_features[i, ti-1, :] for i, ti in enumerate(lens_features)], dim=0)
+
+        h0 = self.encoder_to_hidden(encoder_features).unsqueeze(dim=0)
+        c0 = torch.zeros_like(h0)
+
+        # We now need to iterate manually over the time steps to
+        # perform the decoding since we must be feeding in the characters
+        # we decoded
+
+        # The first character to feed is the soschar
+        # input_chars is (batch, )
+        input_chars = torch.LongTensor([charmap.encode(charmap.soschar)])
+
+        # Collection holding :
+        # - the possible alternatives,
+        # - their log probabilities
+        # - the hidden and cell states they had
+        # We need all these to go on expanding the tree for decoding
+        sequences = [ [0.0, [charmap.soschar], (h0, c0)] ]*beamwidth
+
+        for ti in range(maxlength):
+            # Compute the embeddings of the input chars
+            embeddings = self.embed(input_chars)
+            packed_embedded = pack_padded_sequence(embeddings,
+                                                   lengths =[1]*batch_size,
+                                                   batch_first=True)
+            # Forward propagate through the LSTM for every alternative
+            # and compute the possible expansions for every path
+            expansions = []
+            hidden_states = []
+            for its, (prob, _, (hn_1, cn_1)) in enumerate(sequences):
+                packedout_rnn, (hn, cn) = self.rnn(packed_embedded, (hn_1,cn_1))
+                unpacked_out, _ = pad_packed_sequence(packedout_rnn,
+                                                      batch_first=True)
+                outchar = self.charlin(unpacked_out).squeeze()
+
+                # Compute the log probabilities of the next characters
+                # charlogprobs is (batch, 1, vocab_size)
+                charlogprobs = F.log_softmax(outchar).squeeze()
+
+                # Store all the possible expansions
+                for ci, lpc in enumerate(charlogprobs):
+                    expansions.append((its, ci, prob+lpc))
+                hidden_states.append((hn, cn))
+
+            # Sort the expansions by their conditional probabilities
+            # first is better
+            expansions = sorted(expansions, key=lambda itcp: itcp[2],
+                                reverse=True)
+            expansions_to_keep = expansions[:beamwidth]
+
+            # And keep only the most likely
+            # by updating "sequences"
+            newsequences = []
+            for its, ci, newlogprob in expansions_to_keep:
+                #TODO: WIP
+                newsequences.append()
 
 
 class AttendAndSpell(nn.Module):
@@ -294,7 +365,8 @@ class Model(nn.Module):
     def decode(self,
                beamwidth: int,
                maxlength: int,
-               inputs: torch.Tensor) -> PackedSequence:
+               inputs: torch.Tensor,
+               charmap: data.CharMap) -> PackedSequence:
         """
         Performs beam search decode of the provided spectrogram
         Args:
@@ -305,10 +377,12 @@ class Model(nn.Module):
         Returns:
             out_decoder(torch.Tensor): The decoded sequences
         """
-        # Forward propagated through the encoder
-        packed_out_listen = self.listener(inputs)
-        # Performing beam search on the decoder
-        packed_out_decoder = self.decoder.decode(beamwidth,
-                                                 maxlength,
-                                                 packed_out_listen)
-        return packed_out_decoder
+        with torch.no_grad():
+            # Forward propagated through the encoder
+            packed_out_listen = self.listener(inputs)
+            # Performing beam search on the decoder
+            packed_out_decoder = self.decoder.decode(beamwidth,
+                                                     maxlength,
+                                                     packed_out_listen,
+                                                     charmap)
+            return packed_out_decoder

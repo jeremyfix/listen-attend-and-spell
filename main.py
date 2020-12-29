@@ -229,7 +229,7 @@ def test(args):
                                        batch_first=True)
 
     logger.info("Decoding the spectrogram")
-    model.decode(args.beamwidth, args.maxlength, spectrogram)
+    model.decode(args.beamwidth, args.maxlength, spectrogram, charmap)
 
 
 if __name__ == '__main__':
@@ -290,13 +290,15 @@ if __name__ == '__main__':
                         type=Path,
                         help="The path to the audio file to transcript")
     parser.add_argument("--beamwidth",
-                       type=int,
-                       help="The number of alternatives to consider when"
-                       " for beam search decoding")
+                        type=int,
+                        default=3,
+                        help="The number of alternatives to consider when"
+                        " for beam search decoding")
     parser.add_argument("--maxlength",
-                       type=int,
-                       help="The maximum length of the decoded string if no"
-                       " <eos> is predicted.")
+                        type=int,
+                        default=100,
+                        help="The maximum length of the decoded string if no"
+                        " <eos> is predicted.")
 
 
     args = parser.parse_args()
