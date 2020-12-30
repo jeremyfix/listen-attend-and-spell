@@ -229,7 +229,7 @@ class Decoder(nn.Module):
             for its, (prob, seq, (hn_1, cn_1)) in enumerate(sequences):
 
                 # Compute the embeddings of the input chars
-                input_char = torch.LongTensor([[seq[-1]]], device=encoder_features.device)
+                input_char = torch.LongTensor([[seq[-1]]]).to(encoder_features.device)
                 embeddings = self.embed(input_char)
                 packed_embedded = pack_padded_sequence(embeddings,
                                                        lengths=[1]*batch_size,
