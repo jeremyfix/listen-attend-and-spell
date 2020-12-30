@@ -214,10 +214,6 @@ class Decoder(nn.Module):
         # perform the decoding since we must be feeding in the characters
         # we decoded
 
-        # The first character to feed is the soschar
-        # input_chars is (batch, )
-        input_chars = torch.LongTensor([charmap.encode(charmap.soschar)])
-
         # Collection holding :
         # - the possible alternatives,
         # - their log probabilities
@@ -226,23 +222,21 @@ class Decoder(nn.Module):
         sequences = [[0.0, charmap.encode(charmap.soschar), (h0, c0)]]
 
         for ti in range(maxlength):
-
-            #TODO: there is a bug : 
-            # 1) we need to update the embeddings before looping
-            # 2) we need to propagate, for every considered sequence,
-            #    just the correct embedding
-
-            # Compute the embeddings of the input chars
-            embeddings = self.embed(input_chars)
-            packed_embedded = pack_padded_sequence(embeddings,
-                                                   lengths=[1]*batch_size,
-                                                   batch_first=True)
             # Forward propagate through the LSTM for every alternative
             # and compute the possible expansions for every path
             expansions = []
             hidden_states = []
-            for its, (prob, _, (hn_1, cn_1)) in enumerate(sequences):
-                packedout_rnn, (hn, cn) = self.rnn(packed_embedded, (hn_1,cn_1))
+            for its, (prob, seq, (hn_1, cn_1)) in enumerate(sequences):
+
+                # Compute the embeddings of the input chars
+                input_char = torch.LongTensor([[seq[-1]]])
+                embeddings = self.embed(input_char)
+                packed_embedded = pack_padded_sequence(embeddings,
+                                                       lengths=[1]*batch_size,
+                                                       batch_first=True)
+
+                packedout_rnn, (hn, cn) = self.rnn(packed_embedded,
+                                                   (hn_1, cn_1))
                 unpacked_out, _ = pad_packed_sequence(packedout_rnn,
                                                       batch_first=True)
                 outchar = self.charlin(unpacked_out).squeeze()
