@@ -109,7 +109,12 @@ class CharMap(object):
 
 class WaveformProcessor(object):
 
-    def __init__(self):
+    def __init__(self,
+                 nmels: int):
+        """
+        Args:
+            nmels:  the number of mel scales to consider
+        """
         nfft = int(_DEFAULT_WIN_LENGTH * 1e-3 * _DEFAULT_RATE)
         # We need to memorize nstep since it is the downscaling
         # factor from the waveform to the spectrogram
@@ -118,7 +123,7 @@ class WaveformProcessor(object):
             MelSpectrogram(sample_rate=_DEFAULT_RATE,
                            n_fft=nfft,
                            hop_length=self.nstep,
-                           n_mels=_DEFAULT_NUM_MELS),
+                           n_mels=nmels),
             AmplitudeToDB()
         )
 
@@ -150,8 +155,13 @@ class BatchCollate(object):
     Collator for the individual data to build up the minibatches
     """
 
-    def __init__(self):
-        self.waveform_processor = WaveformProcessor()
+    def __init__(self,
+                 nmels: int):
+        """
+        Args:
+            nmels (int) : the number of mel scales to consider
+        """
+        self.waveform_processor = WaveformProcessor(nmels)
         self.charmap = CharMap()
 
     def __call__(self, batch):
@@ -218,7 +228,8 @@ def get_dataloaders(commonvoice_root: str,
                     cuda: bool,
                     batch_size: int = 64,
                     n_threads: int = 4,
-                    small_experiment:bool = False):
+                    small_experiment:bool = False,
+                    nmels: int = _DEFAULT_NUM_MELS):
     """
     Build and return the pytorch dataloaders
 
@@ -231,6 +242,7 @@ def get_dataloaders(commonvoice_root: str,
         batch_size (int) : the number of samples per minibatch
         n_threads (int) : the number of threads to use for dataloading
         small (bool) : whether or not to use small subsets, usefull for debug
+        nmels (int) : the number of mel scales to consider
     """
     dataset_loader = functools.partial(load_dataset,
                                        commonvoice_root=commonvoice_root,
@@ -247,7 +259,7 @@ def get_dataloaders(commonvoice_root: str,
         test_dataset = torch.utils.data.Subset(test_dataset,
                                                indices=indices)
 
-    batch_collate_fn = BatchCollate()
+    batch_collate_fn = BatchCollate(nmels)
 
     train_loader = torch.utils.data.DataLoader(train_dataset,
                                                batch_size=batch_size,

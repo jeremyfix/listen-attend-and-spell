@@ -72,7 +72,8 @@ def train(args):
                                                                    args.datasetversion,
                                                                    cuda=use_cuda,
                                                                    n_threads=args.nthreads,
-                                                                   small_experiment=args.debug)
+                                                                   small_experiment=args.debug,
+                                                                   nmels=args.nmels)
     # We need the char map to know about the vocabulary size
     charmap = data.CharMap()
     vocab_size = charmap.vocab_size
@@ -209,7 +210,7 @@ def test(args):
     # Load and preprocess the audiofile
     logger.info("Loading and preprocessing the audio file")
     waveform, sample_rate = torchaudio.load(args.audiofile)
-    waveform_processor = data.WaveformProcessor()
+    waveform_processor = data.WaveformProcessor(n_mels)
     spectrogram = waveform_processor(waveform).to(device)
     spectro_length = spectrogram.shape[1]
 
