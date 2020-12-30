@@ -170,6 +170,7 @@ def train(args):
         decoding_results = "## Decoding results on the validation set\n"
         valid_batch = next(iter(valid_loader))
         spectro, transcripts = valid_batch
+        spectro = spectro.to(device)
         # unpacked_spectro is (batch_size, seq_len, n_mels)
         unpacked_spectro, lens_spectro = pad_packed_sequence(spectro, batch_first=True)
         # unpacked_transcripts is (batch_size, seq_len)
@@ -177,7 +178,6 @@ def train(args):
         # valid_batch is (batch, seq_len, n_mels)
         for idxv in range(5):
             spectrogram = unpacked_spectro[idxv, :, :].unsqueeze(dim=0)
-            print(spectrogram.device)
             spectrogram = pack_padded_sequence(spectrogram, batch_first=True,
                                                lengths=[lens_spectro[idxv]])
             likely_sequences = model.decode(args.beamwidth,
