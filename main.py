@@ -166,8 +166,31 @@ def train(args):
                                           e+1)
 
         # Try to decode some of the validation samples
+        model.eval()
+        decoding_results = "## Decoding results on the validation set\n"
+        valid_batch = next(iter(valid_loader))
+        spectro, transcripts = valid_batch
+        # unpacked_spectro is (batch_size, seq_len, n_mels)
+        unpacked_spectro, lens_spectro = pad_packed_sequence(spectro, batch_first=True)
+        # unpacked_transcripts is (batch_size, seq_len)
+        unpacked_transcripts, lens_transcripts = pad_packed_sequence(transcripts, batch_first=True)
+        # valid_batch is (batch, seq_len, n_mels)
+        for idxv in range(5):
+            spectrogram = unpacked_spectro[idxv, :, :].unsqueeze(dim=0)
+            spectrogram = pack_padded_sequence(spectrogram, batch_first=True,
+                                               lengths = [lens_spectro[idxv]])
+            likely_sequences = model.decode(args.beamwidth,
+                                            args.maxlength,
+                                            spectrogram,
+                                            charmap)
 
-        # And save them to the tensorboard
+            decoding_results += "\nGround truth : " + charmap.decode(unpacked_transcripts[idxv]) + '\n'
+            decoding_results += "Log prob     Sequence\n"
+            decoding_results += "\n".join(["{:.2f}        {}".format(p, s) for (p, s) in likely_sequences])
+            decoding_results += '\n'
+        print(decoding_results)
+        tensorboard_writer.add_text("Decodings", deepcs.display.htmlize(decoding_results))
+
 
 
 
@@ -232,8 +255,7 @@ def test(args):
     logger.info("Decoding the spectrogram")
     likely_sequences = model.decode(args.beamwidth, args.maxlength, spectrogram, charmap)
     print("Log prob    Sequence\n")
-    print("\n".join(["{:.2f}      {}".format(p, s) for (p, s) in likely_sequences]
-               ))
+    print("\n".join(["{:.2f}      {}".format(p, s) for (p, s) in likely_sequences]))
 
 
 if __name__ == '__main__':
