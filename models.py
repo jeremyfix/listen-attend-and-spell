@@ -242,8 +242,8 @@ class Decoder(nn.Module):
                 outchar = self.charlin(unpacked_out).squeeze()
 
                 # Compute the log probabilities of the next characters
-                # charlogprobs is (batch, 1, vocab_size)
-                charlogprobs = F.log_softmax(outchar, dim=2).squeeze()
+                # charlogprobs is (vocab_size, )
+                charlogprobs = F.log_softmax(outchar, dim=0).squeeze()
 
                 # Store all the possible expansions
                 for ci, lpc in enumerate(charlogprobs):
