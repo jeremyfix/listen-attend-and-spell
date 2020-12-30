@@ -120,6 +120,7 @@ class Decoder(nn.Module):
         # A linear layer for projecting the encoder features to the
         # initial hidden state of the LSTM
         self.encoder_to_hidden = nn.Linear(num_inputs, self.num_hidden)
+        self.encoder_to_cell = nn.Linear(num_inputs, self.num_hidden)
 
         # The decoder RNN
         self.rnn = nn.LSTM(dim_embed,
@@ -158,10 +159,13 @@ class Decoder(nn.Module):
         unpacked_features, lens_features = pad_packed_sequence(packed_features,
                                                                batch_first=True)
         # unpacked_features is (batch_size, seq_len, num_features)
+        # encoder_features is (batch_size, num_features)
         encoder_features = torch.stack([unpacked_features[i, ti-1, :] for i, ti in enumerate(lens_features)], dim=0)
 
-        c0 = self.encoder_to_hidden(encoder_features).unsqueeze(dim=0)
-        h0 = torch.zeros_like(c0)
+        # c0 is (1, batch_size, num_hidden)
+        c0 = self.encoder_to_cell(encoder_features).unsqueeze(dim=0)
+        # h0 is (1, batch_size, num_hidden)
+        h0 = self.encoder_to_hidden(encoder_features).unsqueeze(dim=0)
         packedout_rnn, _ = self.rnn(packed_embedded, (h0, c0))
 
         unpacked_out, lens_out = pad_packed_sequence(packedout_rnn,
@@ -207,8 +211,10 @@ class Decoder(nn.Module):
         # unpacked_features is (batch_size, seq_len, num_features)
         encoder_features = torch.stack([unpacked_features[i, ti-1, :] for i, ti in enumerate(lens_features)], dim=0)
 
-        c0 = self.encoder_to_hidden(encoder_features).unsqueeze(dim=0)
-        h0 = torch.zeros_like(c0)
+        # c0 is (1, batch_size, num_hidden)
+        c0 = self.encoder_to_cell(encoder_features).unsqueeze(dim=0)
+        # h0 is (1, batch_size, num_hidden)
+        h0 = self.encoder_to_hidden(encoder_features).unsqueeze(dim=0)
 
         # We now need to iterate manually over the time steps to
         # perform the decoding since we must be feeding in the characters
