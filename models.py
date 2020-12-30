@@ -133,6 +133,9 @@ class Decoder(nn.Module):
         # The linear linear before the softmax
         self.charlin = nn.Linear(self.num_hidden, self.vocab_size)
 
+    def set_forcing(self, forcing):
+        self.teacher_forcing = forcing
+
     def forward(self,
                 packed_features: PackedSequence,
                 packed_gt_outputs: PackedSequence) -> PackedSequence:
@@ -431,6 +434,9 @@ class Model(nn.Module):
         #                                        2*num_hidden_listen,
         #                                        dim_embed,
         #                                        num_hidden_spell)
+
+    def set_forcing(self, forcing):
+        self.decoder.set_forcing(forcing)
 
     def forward(self,
                 inputs: torch.Tensor,

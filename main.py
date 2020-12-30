@@ -123,6 +123,10 @@ def train(args):
 
     # Training loop
     for e in range(args.num_epochs):
+        if e == 5 and args.teacher_forcing:
+            logger.info("Disabling teacher forcing")
+            model.set_forcing(False)
+
         ftrain(model,
                train_loader,
                celoss,
