@@ -217,7 +217,7 @@ def test(args):
     logger.info("Plotting the spectrogram")
     fig = plt.figure()
     ax = fig.add_subplot()
-    ax.imshow(spectrogram[0].numpy(),
+    ax.imshow(spectrogram[0].cpu().numpy(),
               aspect='equal', cmap='magma', origin='lower')
     ax.set_xlabel("Mel scale")
     ax.set_ylabel("Time (sample)")
