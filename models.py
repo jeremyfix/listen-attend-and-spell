@@ -160,8 +160,8 @@ class Decoder(nn.Module):
         # unpacked_features is (batch_size, seq_len, num_features)
         encoder_features = torch.stack([unpacked_features[i, ti-1, :] for i, ti in enumerate(lens_features)], dim=0)
 
-        h0 = self.encoder_to_hidden(encoder_features).unsqueeze(dim=0)
-        c0 = torch.zeros_like(h0)
+        c0 = self.encoder_to_hidden(encoder_features).unsqueeze(dim=0)
+        h0 = torch.zeros_like(c0)
         packedout_rnn, _ = self.rnn(packed_embedded, (h0, c0))
 
         unpacked_out, lens_out = pad_packed_sequence(packedout_rnn,
@@ -207,8 +207,8 @@ class Decoder(nn.Module):
         # unpacked_features is (batch_size, seq_len, num_features)
         encoder_features = torch.stack([unpacked_features[i, ti-1, :] for i, ti in enumerate(lens_features)], dim=0)
 
-        h0 = self.encoder_to_hidden(encoder_features).unsqueeze(dim=0)
-        c0 = torch.zeros_like(h0)
+        c0 = self.encoder_to_hidden(encoder_features).unsqueeze(dim=0)
+        h0 = torch.zeros_like(c0)
 
         # We now need to iterate manually over the time steps to
         # perform the decoding since we must be feeding in the characters
