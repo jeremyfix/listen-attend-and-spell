@@ -76,7 +76,6 @@ def train(args):
                                                                    nmels=args.nmels)
     # We need the char map to know about the vocabulary size
     charmap = data.CharMap()
-    vocab_size = charmap.vocab_size
 
     # Model definition
     n_mels = args.nmels
@@ -84,10 +83,11 @@ def train(args):
     n_hidden_spell = args.nhidden_spell
     dim_embed = args.dim_embed
     model = models.Model(n_mels,
-                         vocab_size,
+                         charmap,
                          n_hidden_listen,
                          dim_embed,
-                         n_hidden_spell)
+                         n_hidden_spell,
+                         args.teacher_forcing)
     model.to(device)
 
     # Loss, optimizer
@@ -185,10 +185,7 @@ def train(args):
                                               lengths=[lens_transcripts[idxv]])
             likely_sequences = model.decode(args.beamwidth,
                                             args.maxlength,
-                                            spectrogram,
-                                            charmap,
-                                            transcript
-                                            )
+                                            spectrogram)
 
             decoding_results += "\nGround truth : " + charmap.decode(unpacked_transcripts[idxv]) + '\n'
             decoding_results += "Log prob     Sequence\n"
@@ -212,7 +209,6 @@ def test(args):
 
     # We need the char map to know about the vocabulary size
     charmap = data.CharMap()
-    vocab_size = charmap.vocab_size
 
     # Create the model
     # It is required to build up the same architecture than the one
@@ -226,10 +222,11 @@ def test(args):
 
     logger.info("Building the model")
     model = models.Model(n_mels,
-                         vocab_size,
+                         charmap,
                          n_hidden_listen,
                          dim_embed,
-                         n_hidden_spell)
+                         n_hidden_spell,
+                         teacher_forcing=None)
     model.to(device)
     model.load_state_dict(torch.load(args.modelpath))
 
@@ -259,7 +256,7 @@ def test(args):
                                        batch_first=True)
 
     logger.info("Decoding the spectrogram")
-    likely_sequences = model.decode(args.beamwidth, args.maxlength, spectrogram, charmap)
+    likely_sequences = model.decode(args.beamwidth, args.maxlength, spectrogram)
     print("Log prob    Sequence\n")
     print("\n".join(["{:.2f}      {}".format(p, s) for (p, s) in likely_sequences]))
 
@@ -313,6 +310,10 @@ if __name__ == '__main__':
                         help="The dimensionality of the embedding layer "
                         "for the input characters of the decoder",
                         default=128)
+    parser.add_argument("--teacher_forcing",
+                        type=bool,
+                        help="Whether or not to use teacher forcing",
+                        default=False)
 
     # For testing/decoding
     parser.add_argument("--modelpath",

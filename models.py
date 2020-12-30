@@ -103,19 +103,22 @@ class Decoder(nn.Module):
     """
 
     def __init__(self,
-                 vocab_size: int,
+                 charmap: data.CharMap,
                  num_inputs: int,
                  dim_embed: int,
-                 num_hidden: int) -> None:
+                 num_hidden: int,
+                 teacher_forcing: bool) -> None:
         super(Decoder, self).__init__()
-        self.vocab_size = vocab_size
+        self.charmap = charmap
+        self.vocab_size = self.charmap.vocab_size
         self.num_inputs = num_inputs
         self.dim_embed = dim_embed
         self.num_hidden = num_hidden
+        self.teacher_forcing = teacher_forcing
 
         # An embedding layer for processing the grounth truth characters
         # Note: can be initialized from one-hot
-        self.embed = nn.Embedding(vocab_size, dim_embed)
+        self.embed = nn.Embedding(self.vocab_size, dim_embed)
 
         # A linear layer for projecting the encoder features to the
         # initial hidden state of the LSTM
@@ -138,47 +141,110 @@ class Decoder(nn.Module):
         packed_gt_outputs : (batch_size, seq_len)
         packed_outputs : (batch_size, seq_len, vocab_size)
         """
-
-        unpacked_targets, lens_targets = pad_packed_sequence(packed_gt_outputs,
-                                                             batch_first=True)
-        # Remove the <eos>
-        lens_targets -= 1
-
-        # Forward propagate through the embedding layer
-        # embeddings is (batch_size, Ty, dim_embedding)
-        embeddings = self.embed(unpacked_targets)
-
-        # Pack the result
-        packed_embedded = pack_padded_sequence(embeddings,
-                                               lengths=lens_targets,
-                                               enforce_sorted=False,
-                                               batch_first=True)
-
         # Use the last encoder_features to compute the initial hidden
         # state of the decoder
         unpacked_features, lens_features = pad_packed_sequence(packed_features,
                                                                batch_first=True)
+        batch_size, _, _ = unpacked_features.shape
+        device = unpacked_features.device
+
         # unpacked_features is (batch_size, seq_len, num_features)
-        # encoder_features is (batch_size, num_features)
         encoder_features = torch.stack([unpacked_features[i, ti-1, :] for i, ti in enumerate(lens_features)], dim=0)
 
         # c0 is (1, batch_size, num_hidden)
         c0 = self.encoder_to_cell(encoder_features).unsqueeze(dim=0)
         # h0 is (1, batch_size, num_hidden)
         h0 = self.encoder_to_hidden(encoder_features).unsqueeze(dim=0)
-        packedout_rnn, _ = self.rnn(packed_embedded, (h0, c0))
 
-        unpacked_out, lens_out = pad_packed_sequence(packedout_rnn,
-                                                     batch_first=True)
+        if self.teacher_forcing:
+            # We proceed with teacher forcing
+            # this might help training but also makes differences
+            # between training and inference
 
-        # Compute the logits over the vocabulary
-        # outchar is (batch_size, seq_len, vocab_size)
-        outchar = self.charlin(unpacked_out)
+            unpacked_targets, lens_targets = pad_packed_sequence(packed_gt_outputs,
+                                                                 batch_first=True)
+            # Remove the <eos>
+            lens_targets -= 1
 
-        return pack_padded_sequence(outchar,
-                                    batch_first=True,
-                                    enforce_sorted=False,
-                                    lengths=lens_targets)
+            # Forward propagate through the embedding layer
+            # embeddings is (batch_size, Ty, dim_embedding)
+            embeddings = self.embed(unpacked_targets)
+
+            # Pack the result
+            packed_embedded = pack_padded_sequence(embeddings,
+                                                   lengths=lens_targets,
+                                                   enforce_sorted=False,
+                                                   batch_first=True)
+
+            packedout_rnn, _ = self.rnn(packed_embedded, (h0, c0))
+
+            unpacked_out, lens_out = pad_packed_sequence(packedout_rnn,
+                                                         batch_first=True)
+
+            # Compute the logits over the vocabulary
+            # outchar is (batch_size, seq_len, vocab_size)
+            outchar = self.charlin(unpacked_out)
+
+            return pack_padded_sequence(outchar,
+                                        batch_first=True,
+                                        enforce_sorted=False,
+                                        lengths=lens_targets)
+        else:
+            # Without teacher forcing, we manually unroll the loop
+            # to provide as input the character with the highest
+            # probability
+
+            # We start all (for every sample in the batch) the decoders
+            # with the sos token
+            soschar_token = self.charmap.encode(self.charmap.soschar)
+            input_chars = torch.LongTensor([soschar_token] * batch_size).to(device)
+            hn_1, cn_1 = h0, c0
+
+            # Unpack the targets to get
+            # 1- the maxlength number of steps during which to iterate
+            # 2- to extract the probabilities at the right time step
+            #    for every sample in the minibatch
+            unpacked_targets, lens_targets = pad_packed_sequence(packed_gt_outputs,
+                                                                 batch_first=True)
+
+            max_length = lens_targets.max().item()
+            outchar = None
+            for ti in range(max_length-1):
+                # Compute the input character embeddings
+                embeddings = self.embed(input_chars)
+
+                # Forward propagate one step through the RNN
+                out_rnn, (hn, cn) = self.rnn(embeddings,
+                                             (hn_1, cn_1))
+                out_rnn = out_rnn.squeeze()
+
+                # Compute the probability distribution over the characters
+                # outchar_n is (batch_size, vocab_size)
+                outchar_n = self.charlin(out_rnn)
+                if outchar is None:
+                    outchar = outchar_n.unsqueeze(dim=0)
+                else:
+                    outchar = torch.vstack([outchar,
+                                            outchar_n.unsqueeze(dim=0)])
+
+                # Loop
+                # 1- update the hidden states of the previous step
+                hn_1, cn_1 = hn, cn
+                # 2- update the input chars and their embeddings
+                input_chars = outchar_n.argmax(dim=1).unsqueeze(dim=1)
+
+
+            # At the end of the loop, outchar is (seq_len, batch_size, vocab_size)
+            # we permute it to be (batch_size, seq_len, vocab_size)
+            outchar = outchar.permute(1, 0, 2)
+
+            # Compute the logits over the vocabulary
+            # outchar is (batch_size, seq_len, vocab_size)
+            return pack_padded_sequence(outchar,
+                                        batch_first=True,
+                                        enforce_sorted=False,
+                                        lengths=lens_targets-1)
+
 
     def decode(self,
                beamwidth: int,
@@ -196,10 +262,15 @@ class Decoder(nn.Module):
             predicted
             packed_features(torch.Tensor): The packed outputs of the encoder
                                            (batch, seq_len, num_features)
+            charmap 
+            gt_transcripts
         Returns:
             packed_outputs(PackedSequence): The most likely decoded sequences
                                             (batch, maxlength)
         """
+
+        if gt_transcript is not None:
+            raise NotImplementedError("Evaluating the probability of a transcript is not yet implemented")
 
         # Use the last encoder_features to compute the initial hidden
         # state of the decoder
@@ -275,6 +346,7 @@ class Decoder(nn.Module):
         # Return the candidates with their logprobabilities
         return [ (p, charmap.decode(s)) for p, s, _ in sequences ]
 
+
 class AttendAndSpell(nn.Module):
 
     def __init__(self,
@@ -331,26 +403,30 @@ class Model(nn.Module):
 
     def __init__(self,
                  n_mels: int,
-                 vocab_size: int,
+                 charmap,
                  num_hidden_listen: int,
                  dim_embed: int,
-                 num_hidden_spell: int) -> None:
+                 num_hidden_spell: int,
+                 teacher_forcing: bool) -> None:
         """
         Args:
             n_mels (int)  The number of input mel scales
-            vocab_size (int) The size of the vocabulary
+            charmap
             num_hidden_listen(int): The number of LSTM cells per layer, per
                                     direction for the listen module
             dim_embed(int): The size of the embedding for the Spell module
             num_hidden_spell(int): The number of LSTM cells per layer for
                                    the spell module
+            teacher_forcing(bool) : whether to use teacher forcing
         """
         super(Model, self).__init__()
+        self.charmap = charmap
         self.listener = EncoderListener(n_mels, num_hidden_listen)
-        self.decoder = Decoder(vocab_size,
+        self.decoder = Decoder(charmap,
                                4*num_hidden_listen,
                                dim_embed,
-                               num_hidden_spell)
+                               num_hidden_spell,
+                               teacher_forcing)
         # self.attend_and_spell = AttendAndSpell(vocab_size,
         #                                        2*num_hidden_listen,
         #                                        dim_embed,
@@ -377,7 +453,6 @@ class Model(nn.Module):
                beamwidth: int,
                maxlength: int,
                inputs: PackedSequence,
-               charmap: data.CharMap,
                transcript: PackedSequence=None) -> PackedSequence:
         """
         Performs beam search decode of the provided spectrogram
@@ -399,6 +474,6 @@ class Model(nn.Module):
             packed_out_decoder = self.decoder.decode(beamwidth,
                                                      maxlength,
                                                      packed_out_listen,
-                                                     charmap,
+                                                     self.charmap,
                                                      transcript)
             return packed_out_decoder
