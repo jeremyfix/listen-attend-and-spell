@@ -184,7 +184,8 @@ class Decoder(nn.Module):
                beamwidth: int,
                maxlength: int,
                packed_features: PackedSequence,
-               charmap: data.CharMap) -> PackedSequence:
+               charmap: data.CharMap,
+               gt_transcript: PackedSequence = None) -> PackedSequence:
         """
         Note: cannot handle more than one sample at a time
 
@@ -375,8 +376,9 @@ class Model(nn.Module):
     def decode(self,
                beamwidth: int,
                maxlength: int,
-               inputs: torch.Tensor,
-               charmap: data.CharMap) -> PackedSequence:
+               inputs: PackedSequence,
+               charmap: data.CharMap,
+               transcript: PackedSequence=None) -> PackedSequence:
         """
         Performs beam search decode of the provided spectrogram
         Args:
@@ -384,6 +386,9 @@ class Model(nn.Module):
             maxlength(int): The maximal length of the sequence if no <eos> is
                              predicted
             inputs(torch.Tensor): The input spectrograms
+            charmap
+            transcript (PackedSequence): optional, used for teacher forcing
+                                         decoding (for debug)
         Returns:
             out_decoder(torch.Tensor): The decoded sequences
         """
@@ -394,5 +399,6 @@ class Model(nn.Module):
             packed_out_decoder = self.decoder.decode(beamwidth,
                                                      maxlength,
                                                      packed_out_listen,
-                                                     charmap)
+                                                     charmap,
+                                                     transcript)
             return packed_out_decoder

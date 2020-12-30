@@ -180,10 +180,15 @@ def train(args):
             spectrogram = unpacked_spectro[idxv, :, :].unsqueeze(dim=0)
             spectrogram = pack_padded_sequence(spectrogram, batch_first=True,
                                                lengths=[lens_spectro[idxv]])
+            transcript = unpacked_transcripts[idxv, :].unsqueeze(dim=0)
+            transcript = pack_padded_sequence(transcript, batch_first=True,
+                                              lengths=[lens_transcripts[idxv]])
             likely_sequences = model.decode(args.beamwidth,
                                             args.maxlength,
                                             spectrogram,
-                                            charmap)
+                                            charmap,
+                                            transcript
+                                            )
 
             decoding_results += "\nGround truth : " + charmap.decode(unpacked_transcripts[idxv]) + '\n'
             decoding_results += "Log prob     Sequence\n"
