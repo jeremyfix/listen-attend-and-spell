@@ -177,8 +177,9 @@ def train(args):
         # valid_batch is (batch, seq_len, n_mels)
         for idxv in range(5):
             spectrogram = unpacked_spectro[idxv, :, :].unsqueeze(dim=0)
+            print(spectrogram.device)
             spectrogram = pack_padded_sequence(spectrogram, batch_first=True,
-                                               lengths = [lens_spectro[idxv]])
+                                               lengths=[lens_spectro[idxv]])
             likely_sequences = model.decode(args.beamwidth,
                                             args.maxlength,
                                             spectrogram,
