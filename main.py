@@ -210,7 +210,7 @@ def test(args):
     logger.info("Loading and preprocessing the audio file")
     waveform, sample_rate = torchaudio.load(args.audiofile)
     waveform_processor = data.WaveformProcessor()
-    spectrogram = waveform_processor(waveform)
+    spectrogram = waveform_processor(waveform).to(device)
     spectro_length = spectrogram.shape[1]
 
     # Plot the spectrogram
