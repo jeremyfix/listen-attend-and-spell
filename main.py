@@ -11,6 +11,7 @@ from pathlib import Path
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from torch.optim import lr_scheduler
 from torch.nn.utils.rnn import pad_packed_sequence
 from torch.utils.tensorboard import SummaryWriter
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
@@ -142,6 +143,7 @@ def train(args):
 
     model_checkpoint = ModelCheckpoint(model,
                                        os.path.join(logdir, 'best_model.pt'))
+    scheduler = lr_scheduler(optimizer, step_size=1, gamma=0.5)
 
     # Training loop
     for e in range(args.num_epochs):
@@ -167,6 +169,8 @@ def train(args):
                               metrics,
                               num_model_args=2)
         better_model = model_checkpoint.update(valid_metrics['CE'])
+        scheduler.step()
+
         logger.info("[%d/%d] Validation:   Loss : %.3f | Acc : %.3f%% %s"% (e,
                                                                          args.num_epochs,
                                                                          valid_metrics['CE'],

@@ -194,8 +194,8 @@ class Decoder(nn.Module):
                     outchar = outchar_n.unsqueeze(dim=0)
                 else:
                     outchar = torch.cat([outchar,
-                                            outchar_n.unsqueeze(dim=0)],
-                                       dim=0)
+                                         outchar_n.unsqueeze(dim=0)],
+                                        dim=0)
 
                 # Loop
                 # 1- update the input chars
