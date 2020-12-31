@@ -78,7 +78,10 @@ class Decoder(nn.Module):
 
         # An embedding layer for processing the grounth truth characters
         # Note: can be initialized from one-hot
-        self.embed = nn.Embedding(self.vocab_size, dim_embed)
+        self.embed = nn.Sequential(
+            nn.Embedding(self.vocab_size, dim_embed),
+            nn.ReLU()
+        )
 
         # A linear layer for projecting the encoder features to the
         # initial hidden state of the LSTM
@@ -195,7 +198,7 @@ class Decoder(nn.Module):
 
                 # Loop
                 # 1- update the input chars
-                input_chars = outchar_n.argmax(dim=1).unsqueeze(dim=1)
+                input_chars = outchar_n.argmax(dim=1).unsqueeze(dim=1).detach()
                 # 2- update the hidden states of the previous step
                 hn_1 = hn
 
