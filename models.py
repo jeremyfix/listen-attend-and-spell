@@ -13,18 +13,21 @@ class Encoder(nn.Module):
 
     def __init__(self,
                  n_mels: int,
-                 num_hidden: int) -> None:
+                 num_hidden: int,
+                 num_layers: int) -> None:
         """
         Args:
             n_mels (int) : number of input mel scales
             num_hidden (int): number of LSTM cells per layer and per direction
+            num_layers (int) : number of stacked RNN layers
         """
         super(Encoder, self).__init__()
         self.num_hidden = num_hidden
         self.batch_first = True
+        self.num_layers = num_layers
         self.l1 = nn.GRU(n_mels,
                          self.num_hidden,
-                         num_layers=1,
+                         num_layers=num_layers,
                          batch_first=self.batch_first)
         # self.l1 = nn.LSTM(n_mels,
         #                   self.num_hidden,
@@ -62,6 +65,7 @@ class Decoder(nn.Module):
                  num_inputs: int,
                  dim_embed: int,
                  num_hidden: int,
+                 num_layers: int,
                  teacher_forcing: bool) -> None:
         super(Decoder, self).__init__()
         self.charmap = charmap
@@ -69,6 +73,7 @@ class Decoder(nn.Module):
         self.num_inputs = num_inputs
         self.dim_embed = dim_embed
         self.num_hidden = num_hidden
+        self.num_layers = num_layers
         self.teacher_forcing = teacher_forcing
 
         # An embedding layer for processing the grounth truth characters
@@ -85,7 +90,7 @@ class Decoder(nn.Module):
         #                    batch_first=True)
         self.rnn = nn.GRU(dim_embed,
                           self.num_hidden,
-                          num_layers=1,
+                          num_layers=self.num_layers,
                           batch_first=True)
 
         # The linear linear before the softmax
@@ -443,27 +448,33 @@ class Seq2Seq(nn.Module):
                  n_mels: int,
                  charmap,
                  num_hidden_encoder: int,
+                 num_layers_encoder: int,
                  dim_embed: int,
                  num_hidden_decoder: int,
+                 num_layers_decoder: int,
                  teacher_forcing: bool) -> None:
         """
         Args:
             n_mels (int)  The number of input mel scales
             charmap
             num_hidden_encoder(int): The number of LSTM cells for the encoder
+            num_layers_encoder(int): The number of RNN layers for the encoder
             dim_embed(int): The size of the embedding for the Spell module
             num_hidden_deocder(int): The number of LSTM cells for
                                      the decoder
+            num_layers_decoder(int) : THe number of RNN layers for the decoder
             teacher_forcing(bool) : whether to use teacher forcing
         """
         super(Seq2Seq, self).__init__()
         self.charmap = charmap
         self.encoder = Encoder(n_mels,
-                               num_hidden_encoder)
+                               num_hidden_encoder,
+                               num_layers_encoder)
         self.decoder = Decoder(charmap,
                                num_hidden_encoder,
                                dim_embed,
                                num_hidden_decoder,
+                               num_layers_decoder,
                                teacher_forcing)
 
     def set_forcing(self, forcing):

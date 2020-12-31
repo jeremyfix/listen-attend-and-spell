@@ -98,13 +98,17 @@ def train(args):
     # Model definition
     n_mels = args.nmels
     n_hidden_listen = args.nhidden_listen
+    n_layers_encoder = args.nlayers_encoder
     n_hidden_spell = args.nhidden_spell
+    n_layers_decoder = args.nlayers_decoder
     dim_embed = args.dim_embed
     model = models.Seq2Seq(n_mels,
                            charmap,
                            n_hidden_listen,
+                           n_layers_encoder,
                            dim_embed,
                            n_hidden_spell,
+                           n_layers_decoder,
                            args.teacher_forcing)
     model.to(device)
 
@@ -326,11 +330,19 @@ if __name__ == '__main__':
                         type=int,
                         help="The number of scales in the MelSpectrogram",
                         default=data._DEFAULT_NUM_MELS)
+    parser.add_argument("--nlayers_encoder",
+                        type=int,
+                        help="The number of RNN layers for the encoder",
+                        default=1)
     parser.add_argument("--nhidden_listen",
                         type=int,
                         help="The number of units per recurrent layer of "
                         "the encoder layer",
                         default=256)
+    parser.add_argument("--nlayers_decoder",
+                        type=int,
+                        help="The number of RNN layers for the decoder",
+                        default=1)
     parser.add_argument("--nhidden_spell",
                         type=int,
                         help="The number of units per recurrent layer of the "
