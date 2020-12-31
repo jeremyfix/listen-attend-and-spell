@@ -134,6 +134,7 @@ def train(args):
                optimizer,
                device,
                metrics,
+               grad_clip=args.grad_clip,
                num_model_args=2,
                num_epoch=e,
                tensorboard_writer=tensorboard_writer)
@@ -293,6 +294,10 @@ if __name__ == '__main__':
                        type=int,
                        help="The size of the minibatch",
                        default=64)
+    parser.add_argument("--grad_clip",
+                        type=float,
+                        help="The maxnorm of the gradient to clip to",
+                        default=None)
     parser.add_argument("--debug",
                         action="store_true",
                         help="Whether to test on a small experiment")
