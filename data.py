@@ -177,7 +177,6 @@ class BatchCollate(object):
         # Extract the subcomponents
         waveforms = [w for w, _, _ in batch]
         rates = set([r for _, r, _ in batch])
-        print(rates)
         transcripts = [
             torch.LongTensor(
                 self.charmap.encode(self.charmap.soschar +
