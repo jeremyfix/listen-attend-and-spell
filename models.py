@@ -25,7 +25,14 @@ class Encoder(nn.Module):
         self.num_hidden = num_hidden
         self.batch_first = True
         self.num_layers = num_layers
-        self.l1 = nn.GRU(n_mels,
+        self.cnn = nn.Sequential(
+            nn.Conv2d(in_channels=1, out_channels=32,
+                      kernel_size=(3, n_mels),
+                      padding=(1, 0)),
+            nn.ReLU(),
+            *([nn.Conv2d(32, 32, 3, 1, 1), nn.ReLU()]*3)
+        )
+        self.l1 = nn.GRU(32,
                          self.num_hidden,
                          num_layers=num_layers,
                          batch_first=self.batch_first)
@@ -48,6 +55,17 @@ class Encoder(nn.Module):
         # # _, batch_size, _ = cn.shape
         # # return cn.transpose(0, 1).reshape(batch_size, -1)
         # return (hn, cn)
+
+        # Unpack the input : (batch, time, n_mels)
+
+        unpacked_inputs, lens_inputs = pad_packed_sequence(inputs,
+                                                           batch_first=True)
+        out_cnn = self.cnn(unpacked_inputs.unsqueeze(dim=1))  # batch, 32, time2, 1
+        out_cnn = out_cnn.squeeze(dim=3)  # squeeze only the last dim
+        out_cnn = out_cnn.transpose(1, 2)
+        inputs = pack_padded_sequence(out_cnn,
+                                      lengths=lens_inputs,
+                                      batch_first=True)
 
         # hn is (1, batch_size, num_hidden)
         _, hn = self.l1(inputs)
