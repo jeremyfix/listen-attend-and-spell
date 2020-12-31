@@ -320,9 +320,8 @@ if __name__ == '__main__':
                         help="The weight decay coefficient",
                         default=0.01)
     parser.add_argument("--teacher_forcing",
-                        type=bool,
-                        help="Whether or not to use teacher forcing",
-                        default=False)
+                        action="store_true",
+                        help="Whether or not to use teacher forcing")
 
     # For testing/decoding
     parser.add_argument("--modelpath",
