@@ -45,6 +45,7 @@ class Encoder(nn.Module):
         # # return cn.transpose(0, 1).reshape(batch_size, -1)
         # return (hn, cn)
 
+        # hn is (1, batch_size, num_hidden)
         _, hn = self.l1(inputs)
         return hn
 
@@ -154,6 +155,7 @@ class Decoder(nn.Module):
             # We start all (for every sample in the batch) the decoders
             # with the sos token
             soschar_token = self.charmap.encode(self.charmap.soschar)
+            # input_chars is (batch_size, 1)
             input_chars = torch.LongTensor([soschar_token] * batch_size).to(device)
             hn_1 = h0
 
@@ -163,16 +165,16 @@ class Decoder(nn.Module):
             #    for every sample in the minibatch
             unpacked_targets, lens_targets = pad_packed_sequence(packed_gt_outputs,
                                                                  batch_first=True)
-
             max_length = lens_targets.max().item()
             outchar = None
             for ti in range(max_length-1):
                 # Compute the input character embeddings
+                # embeddings is (batch_size, 1, dim_embed)
                 embeddings = self.embed(input_chars)
 
                 # Forward propagate one step through the RNN
-                out_rnn, hn = self.rnn(embeddings,
-                                             hn_1)
+                # out_rnn is (batch_size, 1, n_hidden)
+                out_rnn, hn = self.rnn(embeddings, hn_1)
                 out_rnn = out_rnn.squeeze()
 
                 # Compute the probability distribution over the characters
@@ -185,17 +187,15 @@ class Decoder(nn.Module):
                                             outchar_n.unsqueeze(dim=0)])
 
                 # Loop
-                # 1- update the hidden states of the previous step
-                hn_1 = hn
-                # 2- update the input chars and their embeddings
+                # 1- update the input chars and their embeddings
                 input_chars = outchar_n.argmax(dim=1).unsqueeze(dim=1)
-
+                # 2- update the hidden states of the previous step
+                hn_1 = hn
 
             # At the end of the loop, outchar is (seq_len, batch_size, vocab_size)
             # we permute it to be (batch_size, seq_len, vocab_size)
             outchar = outchar.permute(1, 0, 2)
 
-            # Compute the logits over the vocabulary
             # outchar is (batch_size, seq_len, vocab_size)
             return pack_padded_sequence(outchar,
                                         batch_first=True,
