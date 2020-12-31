@@ -16,10 +16,10 @@ from torchaudio.transforms import Spectrogram, AmplitudeToDB, MelScale, MelSpect
 
 _DEFAULT_COMMONVOICE_ROOT = "/opt/Datasets/CommonVoice/"
 _DEFAULT_COMMONVOICE_VERSION = "v1"
-_DEFAULT_RATE = 44000  # Hz
+_DEFAULT_RATE = 48000  # Hz
 _DEFAULT_WIN_LENGTH = 25  # ms
 _DEFAULT_WIN_STEP = 15  # ms
-_DEFAULT_NUM_MELS = 40
+_DEFAULT_NUM_MELS = 128
 
 
 def load_dataset(fold: str,
@@ -177,6 +177,7 @@ class BatchCollate(object):
         # Extract the subcomponents
         waveforms = [w for w, _, _ in batch]
         rates = set([r for _, r, _ in batch])
+        print(rates)
         transcripts = [
             torch.LongTensor(
                 self.charmap.encode(self.charmap.soschar +
@@ -283,20 +284,45 @@ def get_dataloaders(commonvoice_root: str,
     return train_loader, valid_loader, test_loader
 
 if __name__ == '__main__':
+    import matplotlib.pyplot as plt
+
     # Data loading
+    batch_size = 4
     train_loader, valid_loader, test_loader = get_dataloaders(_DEFAULT_COMMONVOICE_ROOT,
                                                               _DEFAULT_COMMONVOICE_VERSION,
                                                               cuda=False,
                                                               n_threads=4,
-                                                              batch_size=10)
+                                                              batch_size=batch_size)
 
     X, y = next(iter(train_loader))
+    # X is (batch_size, Tx, n_mels)
     X, lens_X = pad_packed_sequence(X, batch_first=True)
+    # Y is (batch_size, Ty)
     y, lens_y = pad_packed_sequence(y, batch_first=True)
-    print(X.shape)
+
     charmap = CharMap()
     for yi, li in zip(y, lens_y):
         print(charmap.decode(yi)[:li])
+
+    fig, axes = plt.subplots(nrows=batch_size,
+                             ncols=1, sharex=True,
+                             figsize=(10, 7)
+                            )
+    for iax, (ax, spectroi) in enumerate(zip(axes, X)):
+        # spectroi is of shape (n_steps, n_mels)
+        im = ax.imshow(spectroi.T,
+                       extent=[0, spectroi.shape[1]*_DEFAULT_WIN_STEP*1e-3,
+                               0, spectroi.shape[0]],
+                       aspect='auto',
+                       cmap='magma',
+                       origin='lower',
+                       vmin=-100, vmax=10)
+        ax.set_ylabel('Mel scale')
+        ax.set_title('{}'.format(charmap.decode(y[iax][:lens_y[iax]])))
+    fig.colorbar(im, ax=axes.ravel().tolist())
+    plt.xlabel('Time (s.)')
+    plt.savefig('spectro.png')
+    plt.show()
 
     print(charmap.decode(charmap.encode("nous sommes heureux de vous souhaiter nos meilleurs vœux pour 2015")))
     print('œ' in charmap.char2idx)
