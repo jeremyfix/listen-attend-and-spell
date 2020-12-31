@@ -82,12 +82,12 @@ def train(args):
     n_hidden_listen = args.nhidden_listen
     n_hidden_spell = args.nhidden_spell
     dim_embed = args.dim_embed
-    model = models.Model(n_mels,
-                         charmap,
-                         n_hidden_listen,
-                         dim_embed,
-                         n_hidden_spell,
-                         args.teacher_forcing)
+    model = models.Seq2Seq(n_mels,
+                           charmap,
+                           n_hidden_listen,
+                           dim_embed,
+                           n_hidden_spell,
+                           args.teacher_forcing)
     model.to(device)
 
     # Loss, optimizer
@@ -225,12 +225,12 @@ def test(args):
     dim_embed = args.dim_embed
 
     logger.info("Building the model")
-    model = models.Model(n_mels,
-                         charmap,
-                         n_hidden_listen,
-                         dim_embed,
-                         n_hidden_spell,
-                         teacher_forcing=None)
+    model = models.Seq2Seq(n_mels,
+                           charmap,
+                           n_hidden_listen,
+                           dim_embed,
+                           n_hidden_spell,
+                           teacher_forcing=None)
     model.to(device)
     model.load_state_dict(torch.load(args.modelpath))
 
