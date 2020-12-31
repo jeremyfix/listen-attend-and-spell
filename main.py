@@ -71,6 +71,7 @@ def train(args):
     train_loader, valid_loader, test_loader = data.get_dataloaders(args.datasetroot,
                                                                    args.datasetversion,
                                                                    cuda=use_cuda,
+                                                                   batch_size=args.batch_size,
                                                                    n_threads=args.nthreads,
                                                                    small_experiment=args.debug,
                                                                    nmels=args.nmels)
@@ -288,6 +289,10 @@ if __name__ == '__main__':
                        type=int,
                        help="The number of threads to use for loading the data",
                        default=4)
+    parser.add_argument("--batch_size",
+                       type=int,
+                       help="The size of the minibatch",
+                       default=64)
     parser.add_argument("--debug",
                         action="store_true",
                         help="Whether to test on a small experiment")
