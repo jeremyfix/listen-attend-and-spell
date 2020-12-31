@@ -24,6 +24,7 @@ class Encoder(nn.Module):
         self.batch_first = True
         self.l1 = nn.GRU(n_mels,
                          self.num_hidden,
+                         num_layers=3,
                          batch_first=self.batch_first)
         # self.l1 = nn.LSTM(n_mels,
         #                   self.num_hidden,
@@ -84,6 +85,7 @@ class Decoder(nn.Module):
         #                    batch_first=True)
         self.rnn = nn.GRU(dim_embed,
                           self.num_hidden,
+                          num_layers=3,
                           batch_first=True)
 
         # The linear linear before the softmax
