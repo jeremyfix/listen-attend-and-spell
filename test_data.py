@@ -5,10 +5,11 @@
 import os
 import collections
 import json
+import random
 # External imports
 import torch.nn as nn
 import torch.utils
-from torch.nn.utils.rnn import pad_sequence
+from torch.nn.utils.rnn import pad_sequence, pad_packed_sequence, pack_padded_sequence
 import torchaudio
 from torchaudio.datasets import COMMONVOICE
 from torchaudio.transforms import Spectrogram, AmplitudeToDB, MelScale, MelSpectrogram
@@ -157,7 +158,24 @@ def test002():
     plt.savefig('specro.png')
     plt.show()
 
+def test_packed():
+    batch_size = 6
+    data = [ torch.Tensor(list(range(random.randint(1, batch_size)))) for i in range(batch_size)]
+
+    lengths = [ l.size()[0] for l in data]
+    data = pad_sequence(data, padding_value=-1, batch_first=True)
+    print(f"The original padded tensor is {data}")
+
+    packed_data = pack_padded_sequence(data, lengths=lengths, enforce_sorted=False, batch_first=True)
+
+    # Unpack it
+    unpacked_data, lens_data = pad_packed_sequence(packed_data, batch_first=True, padding_value=-1)
+    print(f"The unpacked padded tensor is \n {unpacked_data}")
+
+    print(f"The \"raw\" data attribute of the packed data is {packed_data.data}")
+
 
 if __name__ == '__main__':
     # test001()
-    test002()
+    # test002()
+    test_packed()

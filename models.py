@@ -189,7 +189,7 @@ class Decoder(nn.Module):
                                             outchar_n.unsqueeze(dim=0)])
 
                 # Loop
-                # 1- update the input chars and their embeddings
+                # 1- update the input chars
                 input_chars = outchar_n.argmax(dim=1).unsqueeze(dim=1)
                 # 2- update the hidden states of the previous step
                 hn_1 = hn
@@ -199,6 +199,7 @@ class Decoder(nn.Module):
             outchar = outchar.permute(1, 0, 2)
 
             # outchar is (batch_size, seq_len, vocab_size)
+            # it contains one less character than the targets
             return pack_padded_sequence(outchar,
                                         batch_first=True,
                                         enforce_sorted=False,
