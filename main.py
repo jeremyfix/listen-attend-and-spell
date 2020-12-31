@@ -31,6 +31,15 @@ import models
 def wrap_args(packed_predictions, packed_targets):
     """
     Little wraper to drop the first element of the target
+    And to slice and return the packed_predictions and packed_targets
+    as (batch_size*seq_len, vocab_size) and (batch*seq_len, ) tensors
+
+    This functions takes care of slicing the sequences given their respective
+    lengths
+
+    Args:
+        packed_predictions (PackedSequence) : (batch, seq_len, vocab_size)
+        packed_targets (PackedSequence) : (batch, seq_len)
     """
     # The packed_targets virtualy "contain"
     #  <sos> c1 c2 c3 c4 .... <eos>
@@ -43,18 +52,26 @@ def wrap_args(packed_predictions, packed_targets):
     #  predictions[i, :li-1, ...]
     # predictions, lens_predictions = pad_packed_sequence(packed_predictions,
     #                                                     batch_first=True)
-    targets, lens_targets = pad_packed_sequence(packed_targets,
-                                                batch_first=True)
+    unpacked_targets, lens_targets = pad_packed_sequence(packed_targets,
+                                                         batch_first=True)
     # Remove the <sos> from the targets
-    targets = targets[:, 1:]
+    unpacked_targets = unpacked_targets[:, 1:]
     lens_targets -= 1
-    # Repack it
-    packed_targets = pack_padded_sequence(targets,
-                                          lengths=lens_targets,
-                                          enforce_sorted=False,
-                                          batch_first=True)
 
-    return packed_predictions.data, packed_targets.data
+    targets = torch.hstack([
+        targeti[:leni] for targeti, leni in zip(unpacked_targets,
+                                                lens_targets)
+    ])
+
+    unpacked_predictions, lens_predictions = pad_packed_sequence(packed_predictions,
+                                                                 batch_first=True)
+
+    predictions = torch.vstack([
+        predi[:leni] for predi, leni in zip(unpacked_predictions,
+                                            lens_targets)
+    ])
+
+    return predictions, targets
 
 
 def train(args):
