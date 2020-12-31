@@ -155,7 +155,7 @@ class Decoder(nn.Module):
             # We start all (for every sample in the batch) the decoders
             # with the sos token
             soschar_token = self.charmap.encode(self.charmap.soschar)
-            # input_chars is (batch_size, 1)
+            # input_chars is (batch_size, 1) for seq_len=1
             input_chars = torch.LongTensor([soschar_token] * batch_size).to(device)
             hn_1 = h0
 
@@ -477,7 +477,7 @@ class Seq2Seq(nn.Module):
                 gt_outputs: PackedSequence) -> PackedSequence:
         """
         Args:
-            inputs(PackedSequence): (batch_size, num_mels, time)
+            inputs(PackedSequence): (batch_size, time, n_mels)
             gt_outputs(PackedSequence): (batch_size, time)
         """
 
@@ -556,7 +556,7 @@ class Model(nn.Module):
                 gt_outputs: torch.Tensor) -> PackedSequence:
         """
         Args:
-            inputs(torch.Tensor): (batch_size, num_mels, time)
+            inputs(torch.Tensor): (batch_size, time, n_mels)
             gt_outputs(torch.Tensor): (batch_size, time)
         """
 

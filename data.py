@@ -19,7 +19,7 @@ _DEFAULT_COMMONVOICE_VERSION = "v1"
 _DEFAULT_RATE = 48000  # Hz
 _DEFAULT_WIN_LENGTH = 25  # ms
 _DEFAULT_WIN_STEP = 15  # ms
-_DEFAULT_NUM_MELS = 128
+_DEFAULT_NUM_MELS = 80
 
 
 def load_dataset(fold: str,
@@ -171,7 +171,7 @@ class BatchCollate(object):
 
         Returns:
             a tuple (spectros, targets) with :
-                spectors : (Batch size, n_mels, time)
+                spectors : (Batch size, time, n_mels)
                 targets : (Batch size, time)
         """
         # Extract the subcomponents
@@ -209,6 +209,7 @@ class BatchCollate(object):
                                  batch_first=True)
 
         spectrograms = self.waveform_processor(waveforms)
+        # spectrograms is (B, Tx, n_mels)
         spectrograms = pack_padded_sequence(spectrograms,
                                             lengths=spectro_lengths,
                                             batch_first=True)
