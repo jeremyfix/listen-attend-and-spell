@@ -143,7 +143,7 @@ def train(args):
 
     model_checkpoint = ModelCheckpoint(model,
                                        os.path.join(logdir, 'best_model.pt'))
-    scheduler = lr_scheduler(optimizer, step_size=1, gamma=0.5)
+    scheduler = lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.5)
 
     # Training loop
     for e in range(args.num_epochs):
