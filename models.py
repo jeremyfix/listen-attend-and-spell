@@ -202,7 +202,6 @@ class Decoder(nn.Module):
                                         enforce_sorted=False,
                                         lengths=lens_targets-1)
 
-
     def decode(self,
                beamwidth: int,
                maxlength: int,
@@ -258,7 +257,6 @@ class Decoder(nn.Module):
             # Forward propagate through the LSTM for every alternative
             # and compute the possible expansions for every path
             expansions = []
-            hidden_states = []
             for its, (prob, seq, hn_1) in enumerate(sequences):
 
                 # Compute the embeddings of the input chars
@@ -268,8 +266,7 @@ class Decoder(nn.Module):
                                                        lengths=[1]*batch_size,
                                                        batch_first=True)
 
-                packedout_rnn, hn = self.rnn(packed_embedded,
-                                                   hn_1)
+                packedout_rnn, hn = self.rnn(packed_embedded, hn_1)
                 unpacked_out, _ = pad_packed_sequence(packedout_rnn,
                                                       batch_first=True)
                 outchar = self.charlin(unpacked_out).squeeze()
@@ -280,8 +277,7 @@ class Decoder(nn.Module):
 
                 # Store all the possible expansions
                 for ci, lpc in enumerate(charlogprobs):
-                    expansions.append((its, ci, prob+lpc.item()))
-                hidden_states.append(hn)
+                    expansions.append((its, ci, prob+lpc.item(), hn))
 
             # Sort the expansions by their conditional probabilities
             # first is better
@@ -292,15 +288,13 @@ class Decoder(nn.Module):
             # And keep only the most likely
             # by updating "sequences"
             newsequences = []
-            for its, ci, newlogprob in expansions_to_keep:
+            for its, ci, newlogprob, newhidden in expansions_to_keep:
                 newprob = newlogprob
                 newseq = sequences[its][1] + [ci]
-                newhidden = hidden_states[its]
                 newsequences.append([newprob, newseq, newhidden])
             sequences = newsequences
         # Return the candidates with their logprobabilities
-        return [ (p, charmap.decode(s)) for p, s, _ in sequences ]
-
+        return [(p, charmap.decode(s)) for p, s, _ in sequences]
 
 
 class EncoderListener(nn.Module):
