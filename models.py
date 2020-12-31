@@ -101,7 +101,6 @@ class Decoder(nn.Module):
         h0 = torch.zeros_like(c0)
 
         if self.teacher_forcing:
-            print("with teacher forcing")
             # We proceed with teacher forcing
             # this might help training but also makes differences
             # between training and inference
@@ -135,7 +134,6 @@ class Decoder(nn.Module):
                                         enforce_sorted=False,
                                         lengths=lens_targets)
         else:
-            print("withOUT teacher forcing")
             # Without teacher forcing, we manually unroll the loop
             # to provide as input the character with the highest
             # probability
