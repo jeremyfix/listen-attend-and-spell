@@ -94,8 +94,7 @@ def train(args):
     baseloss = nn.CrossEntropyLoss()
     celoss = lambda *args: baseloss(* wrap_args(*args))
     accuracy = lambda *args: deepcs.metrics.accuracy(* wrap_args(*args))
-    optimizer = optim.AdamW(model.parameters(),
-                            args.weight_decay)
+    optimizer = optim.Adam(model.parameters())
 
     metrics = {
         'CE': celoss,

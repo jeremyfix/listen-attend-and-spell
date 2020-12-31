@@ -37,11 +37,13 @@ class Encoder(nn.Module):
         """
         # Forward pass through the LSTM layer
         # cn is (1, batch_size, num_hidden)
-        _, (_, cn) = self.l1(inputs)
+        _, (hn, cn) = self.l1(inputs)
 
-        _, batch_size, _ = cn.shape
+        # _, batch_size, _ = cn.shape
 
-        return cn.transpose(0, 1).reshape(batch_size, -1)
+        # return cn.transpose(0, 1).reshape(batch_size, -1)
+
+        return (hn, cn)
 
 
 class Decoder(nn.Module):
@@ -70,7 +72,7 @@ class Decoder(nn.Module):
 
         # A linear layer for projecting the encoder features to the
         # initial hidden state of the LSTM
-        self.encoder_to_cell = nn.Linear(num_inputs, self.num_hidden)
+        # self.encoder_to_cell = nn.Linear(num_inputs, self.num_hidden)
 
         # The decoder RNN
         self.rnn = nn.LSTM(dim_embed,
@@ -92,13 +94,19 @@ class Decoder(nn.Module):
         packed_outputs : (batch_size, seq_len, vocab_size)
         """
 
-        batch_size, _ = encoder_features.shape
-        device = encoder_features.device
+        # batch_size, _ = encoder_features.shape
+        # device = encoder_features.device
 
-        # c0 is (1, batch_size, num_hidden)
-        c0 = self.encoder_to_cell(encoder_features).unsqueeze(dim=0)
-        # h0 is (1, batch_size, num_hidden)
-        h0 = torch.zeros_like(c0)
+        # # c0 is (1, batch_size, num_hidden)
+        # c0 = self.encoder_to_cell(encoder_features).unsqueeze(dim=0)
+        # # h0 is (1, batch_size, num_hidden)
+        # h0 = torch.zeros_like(c0)
+
+        h0 = encoder_features[0]
+        c0 = encoder_features[1]
+        device = h0.device
+        batch_size = h0.shape[1]
+
 
         if self.teacher_forcing:
             # We proceed with teacher forcing
@@ -216,14 +224,20 @@ class Decoder(nn.Module):
         if gt_transcript is not None:
             raise NotImplementedError("Evaluating the probability of a transcript is not yet implemented")
 
-        batch_size, _ = encoder_features.shape
+        # batch_size, _ = encoder_features.shape
+
+        # # c0 is (1, batch_size, num_hidden)
+        # c0 = self.encoder_to_cell(encoder_features).unsqueeze(dim=0)
+        # # h0 is (1, batch_size, num_hidden)
+        # h0 = torch.zeros_like(c0) #self.encoder_to_hidden(encoder_features).unsqueeze(dim=0)
+
+        h0 = encoder_features[0]
+        c0 = encoder_features[1]
+        device = h0.device
+        batch_size = h0.shape[1]
+
         if batch_size != 1:
             raise NotImplementedError("Cannot handle batch size larger than 1")
-
-        # c0 is (1, batch_size, num_hidden)
-        c0 = self.encoder_to_cell(encoder_features).unsqueeze(dim=0)
-        # h0 is (1, batch_size, num_hidden)
-        h0 = torch.zeros_like(c0) #self.encoder_to_hidden(encoder_features).unsqueeze(dim=0)
 
         # We now need to iterate manually over the time steps to
         # perform the decoding since we must be feeding in the characters
@@ -244,7 +258,7 @@ class Decoder(nn.Module):
             for its, (prob, seq, (hn_1, cn_1)) in enumerate(sequences):
 
                 # Compute the embeddings of the input chars
-                input_char = torch.LongTensor([[seq[-1]]]).to(encoder_features.device)
+                input_char = torch.LongTensor([[seq[-1]]]).to(device)
                 embeddings = self.embed(input_char)
                 packed_embedded = pack_padded_sequence(embeddings,
                                                        lengths=[1]*batch_size,
