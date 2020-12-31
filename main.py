@@ -94,7 +94,8 @@ def train(args):
     baseloss = nn.CrossEntropyLoss()
     celoss = lambda *args: baseloss(* wrap_args(*args))
     accuracy = lambda *args: deepcs.metrics.accuracy(* wrap_args(*args))
-    optimizer = optim.AdamW(model.parameters())
+    optimizer = optim.AdamW(model.parameters(),
+                            args.weight_decay)
 
     metrics = {
         'CE': celoss,
@@ -314,6 +315,10 @@ if __name__ == '__main__':
                         help="The dimensionality of the embedding layer "
                         "for the input characters of the decoder",
                         default=128)
+    parser.add_argument("--weight_decay",
+                        type=float,
+                        help="The weight decay coefficient",
+                        default=0.01)
     parser.add_argument("--teacher_forcing",
                         type=bool,
                         help="Whether or not to use teacher forcing",
