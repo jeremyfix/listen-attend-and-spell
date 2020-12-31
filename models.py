@@ -22,10 +22,13 @@ class Encoder(nn.Module):
         super(Encoder, self).__init__()
         self.num_hidden = num_hidden
         self.batch_first = True
-        self.l1 = nn.LSTM(n_mels,
-                          self.num_hidden,
-                          bidirectional=False,
-                          batch_first=self.batch_first)
+        self.l1 = nn.GRU(n_mels,
+                         self.num_hidden,
+                         batch_first=self.batch_first)
+        # self.l1 = nn.LSTM(n_mels,
+        #                   self.num_hidden,
+        #                   bidirectional=False,
+        #                   batch_first=self.batch_first)
 
     def forward(self,
                 inputs: PackedSequence) -> PackedSequence:
@@ -35,15 +38,15 @@ class Encoder(nn.Module):
         Returns:
             packed_features : PackedSequence (batch, time//2**3, 2*num_hidden)
         """
-        # Forward pass through the LSTM layer
-        # cn is (1, batch_size, num_hidden)
-        _, (hn, cn) = self.l1(inputs)
+        # # Forward pass through the LSTM layer
+        # # cn is (1, batch_size, num_hidden)
+        # outputs, (hn, cn) = self.l1(inputs)
+        # # _, batch_size, _ = cn.shape
+        # # return cn.transpose(0, 1).reshape(batch_size, -1)
+        # return (hn, cn)
 
-        # _, batch_size, _ = cn.shape
-
-        # return cn.transpose(0, 1).reshape(batch_size, -1)
-
-        return (hn, cn)
+        _, hn = self.l1(inputs)
+        return hn
 
 
 class Decoder(nn.Module):
@@ -75,9 +78,12 @@ class Decoder(nn.Module):
         # self.encoder_to_cell = nn.Linear(num_inputs, self.num_hidden)
 
         # The decoder RNN
-        self.rnn = nn.LSTM(dim_embed,
-                           self.num_hidden,
-                           batch_first=True)
+        # self.rnn = nn.LSTM(dim_embed,
+        #                    self.num_hidden,
+        #                    batch_first=True)
+        self.rnn = nn.GRU(dim_embed,
+                          self.num_hidden,
+                          batch_first=True)
 
         # The linear linear before the softmax
         self.charlin = nn.Linear(self.num_hidden, self.vocab_size)
@@ -102,8 +108,7 @@ class Decoder(nn.Module):
         # # h0 is (1, batch_size, num_hidden)
         # h0 = torch.zeros_like(c0)
 
-        h0 = encoder_features[0]
-        c0 = encoder_features[1]
+        h0 = encoder_features
         device = h0.device
         batch_size = h0.shape[1]
 
@@ -128,7 +133,7 @@ class Decoder(nn.Module):
                                                    enforce_sorted=False,
                                                    batch_first=True)
 
-            packedout_rnn, _ = self.rnn(packed_embedded, (h0, c0))
+            packedout_rnn, _ = self.rnn(packed_embedded, h0)
 
             unpacked_out, lens_out = pad_packed_sequence(packedout_rnn,
                                                          batch_first=True)
@@ -150,7 +155,7 @@ class Decoder(nn.Module):
             # with the sos token
             soschar_token = self.charmap.encode(self.charmap.soschar)
             input_chars = torch.LongTensor([soschar_token] * batch_size).to(device)
-            hn_1, cn_1 = h0, c0
+            hn_1 = h0
 
             # Unpack the targets to get
             # 1- the maxlength number of steps during which to iterate
@@ -166,8 +171,8 @@ class Decoder(nn.Module):
                 embeddings = self.embed(input_chars)
 
                 # Forward propagate one step through the RNN
-                out_rnn, (hn, cn) = self.rnn(embeddings,
-                                             (hn_1, cn_1))
+                out_rnn, hn = self.rnn(embeddings,
+                                             hn_1)
                 out_rnn = out_rnn.squeeze()
 
                 # Compute the probability distribution over the characters
@@ -181,7 +186,7 @@ class Decoder(nn.Module):
 
                 # Loop
                 # 1- update the hidden states of the previous step
-                hn_1, cn_1 = hn, cn
+                hn_1 = hn
                 # 2- update the input chars and their embeddings
                 input_chars = outchar_n.argmax(dim=1).unsqueeze(dim=1)
 
@@ -231,8 +236,7 @@ class Decoder(nn.Module):
         # # h0 is (1, batch_size, num_hidden)
         # h0 = torch.zeros_like(c0) #self.encoder_to_hidden(encoder_features).unsqueeze(dim=0)
 
-        h0 = encoder_features[0]
-        c0 = encoder_features[1]
+        h0 = encoder_features
         device = h0.device
         batch_size = h0.shape[1]
 
@@ -248,14 +252,14 @@ class Decoder(nn.Module):
         # - their log probabilities
         # - the hidden and cell states they had
         # We need all these to go on expanding the tree for decoding
-        sequences = [[0.0, charmap.encode(charmap.soschar), (h0, c0)]]
+        sequences = [[0.0, charmap.encode(charmap.soschar), h0]]
 
         for ti in range(maxlength):
             # Forward propagate through the LSTM for every alternative
             # and compute the possible expansions for every path
             expansions = []
             hidden_states = []
-            for its, (prob, seq, (hn_1, cn_1)) in enumerate(sequences):
+            for its, (prob, seq, hn_1) in enumerate(sequences):
 
                 # Compute the embeddings of the input chars
                 input_char = torch.LongTensor([[seq[-1]]]).to(device)
@@ -264,8 +268,8 @@ class Decoder(nn.Module):
                                                        lengths=[1]*batch_size,
                                                        batch_first=True)
 
-                packedout_rnn, (hn, cn) = self.rnn(packed_embedded,
-                                                   (hn_1, cn_1))
+                packedout_rnn, hn = self.rnn(packed_embedded,
+                                                   hn_1)
                 unpacked_out, _ = pad_packed_sequence(packedout_rnn,
                                                       batch_first=True)
                 outchar = self.charlin(unpacked_out).squeeze()
@@ -277,7 +281,7 @@ class Decoder(nn.Module):
                 # Store all the possible expansions
                 for ci, lpc in enumerate(charlogprobs):
                     expansions.append((its, ci, prob+lpc.item()))
-                hidden_states.append((hn, cn))
+                hidden_states.append(hn)
 
             # Sort the expansions by their conditional probabilities
             # first is better
