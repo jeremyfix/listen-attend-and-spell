@@ -110,24 +110,30 @@ class CharMap(object):
 class WaveformProcessor(object):
 
     def __init__(self,
-                 nmels: int):
+                 nmels: int,
+                 augment: bool):
         """
         Args:
             nmels:  the number of mel scales to consider
+            augment (bool) : whether to use data augmentation or not
         """
         nfft = int(_DEFAULT_WIN_LENGTH * 1e-3 * _DEFAULT_RATE)
         # We need to memorize nstep since it is the downscaling
         # factor from the waveform to the spectrogram
         self.nstep = int(_DEFAULT_WIN_STEP * 1e-3 * _DEFAULT_RATE)
-        self.transform = nn.Sequential(
+        modules = [
             MelSpectrogram(sample_rate=_DEFAULT_RATE,
                            n_fft=nfft,
                            hop_length=self.nstep,
                            n_mels=nmels),
-            AmplitudeToDB(),
-            FrequencyMasking(27),
-            TimeMasking(100)
-        )
+            AmplitudeToDB()
+        ]
+        if augment:
+            modules.extend([
+                FrequencyMasking(27),
+                TimeMasking(100)
+            ])
+        self.transform = nn.Sequential(*modules)
 
     def get_spectro_length(self, waveform_length: int):
         """
@@ -158,12 +164,14 @@ class BatchCollate(object):
     """
 
     def __init__(self,
-                 nmels: int):
+                 nmels: int,
+                 augment: bool):
         """
         Args:
             nmels (int) : the number of mel scales to consider
+            augment (bool) : whether to use data augmentation or not
         """
-        self.waveform_processor = WaveformProcessor(nmels)
+        self.waveform_processor = WaveformProcessor(nmels, augment)
         self.charmap = CharMap()
 
     def __call__(self, batch):
@@ -210,6 +218,7 @@ class BatchCollate(object):
                                  batch_first=True)
 
         spectrograms = self.waveform_processor(waveforms)
+
         # spectrograms is (B, Tx, n_mels)
         spectrograms = pack_padded_sequence(spectrograms,
                                             lengths=spectro_lengths,
@@ -262,25 +271,26 @@ def get_dataloaders(commonvoice_root: str,
         test_dataset = torch.utils.data.Subset(test_dataset,
                                                indices=indices)
 
-    batch_collate_fn = BatchCollate(nmels)
+    batch_collate_train_fn = BatchCollate(nmels, augment=True)
+    batch_collate_infer_fn = BatchCollate(nmels, augment=False)
 
     train_loader = torch.utils.data.DataLoader(train_dataset,
                                                batch_size=batch_size,
                                                shuffle=True,
                                                num_workers=n_threads,
-                                               collate_fn=batch_collate_fn,
+                                               collate_fn=batch_collate_train_fn,
                                                pin_memory=cuda)
     valid_loader = torch.utils.data.DataLoader(valid_dataset,
                                                batch_size=batch_size,
                                                shuffle=False,
                                                num_workers=n_threads,
-                                               collate_fn=batch_collate_fn,
+                                               collate_fn=batch_collate_infer_fn,
                                                pin_memory=cuda)
     test_loader = torch.utils.data.DataLoader(test_dataset,
                                               batch_size=batch_size,
                                               shuffle=False,
                                               num_workers=n_threads,
-                                              collate_fn=batch_collate_fn,
+                                              collate_fn=batch_collate_infer_fn,
                                               pin_memory=cuda)
 
     return train_loader, valid_loader, test_loader
