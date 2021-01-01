@@ -80,7 +80,8 @@ def train(args):
     # Loss, optimizer
     baseloss = nn.CTCLoss(blank=charmap.vocab_size)
     loss = lambda *args: baseloss(* wrap_ctc_args(*args))
-    optimizer = optim.Adam(model.parameters())
+    optimizer = optim.AdamW(model.parameters(),
+                            weight_decay=args.weight_decay)
 
     metrics = {
         'CTC': loss
@@ -105,7 +106,7 @@ def train(args):
 
     model_checkpoint = ModelCheckpoint(model,
                                        os.path.join(logdir, 'best_model.pt'))
-    scheduler = lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.5)
+    scheduler = lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.5)
 
     # Training loop
     for e in range(args.num_epochs):
