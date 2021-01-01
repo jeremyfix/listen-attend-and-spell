@@ -44,7 +44,6 @@ class CTCModel(nn.Module):
                            self.num_hidden,
                            num_layers=num_layers,
                            batch_first=self.batch_first,
-                           dropout=0.5,
                            bidirectional=True)
         # self.rnn = nn.GRU(self.n_mels,
         #                   self.num_hidden,
