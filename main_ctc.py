@@ -176,7 +176,9 @@ def train(args):
             decoding_results += "\n".join(["{:.2f}        {}".format(p, s) for (p, s) in likely_sequences])
             decoding_results += '\n'
         print(decoding_results)
-        tensorboard_writer.add_text("Decodings", deepcs.display.htmlize(decoding_results))
+        tensorboard_writer.add_text("Decodings",
+                                    deepcs.display.htmlize(decoding_results),
+                                    global_step=e+1)
 
 
 if __name__ == '__main__':

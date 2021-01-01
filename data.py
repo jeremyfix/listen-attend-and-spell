@@ -24,22 +24,32 @@ _DEFAULT_NUM_MELS = 80
 
 def load_dataset(fold: str,
                  commonvoice_root: Union[str, Path],
-                 commonvoice_version: str) -> torch.utils.data.Dataset:
+                 commonvoice_version: str,
+                 lang: str = 'fr') -> torch.utils.data.Dataset:
     """
-    Load the commonvoice dataset
+    Load the commonvoice dataset within the path
+    commonvoice_root/commonvoice_version/lang
+
+    In this folder, we expect to find the tsv files of CommonVoice
 
     Args:
         fold (str): the fold to load, e.g. train, dev, test, validated, ..
+        commonvoice_root
 
     Returns:
         torch.utils.data.Dataset: ``dataset``
     """
-    datasetpath = os.path.join(commonvoice_root, commonvoice_version, 'fr')
+    datasetpath = os.path.join(commonvoice_root, commonvoice_version, lang)
     return COMMONVOICE(root=datasetpath,
                        tsv=fold+".tsv")
 
 
 class CharMap(object):
+    """
+    Object in charge of performing the char <-> int conversion
+    It holds the vocabulary and the functions required for performing
+    the conversions in the two directions
+    """
 
     _SOS = 182
     _EOS = 166
@@ -128,10 +138,15 @@ class WaveformProcessor(object):
                            n_mels=nmels),
             AmplitudeToDB()
         ]
+
+        time_mask_duration = 0.5 # s.
+        time_mask_nsamples = int(time_mask_duration / (_DEFAULT_WIN_STEP * 1e-3))
+        nmel_mask = 27
+
         if augment:
             modules.extend([
-                FrequencyMasking(27),
-                TimeMasking(100)
+                FrequencyMasking(nmel_mask),
+                TimeMasking(time_mask_nsamples)
             ])
         self.transform = nn.Sequential(*modules)
 
@@ -139,6 +154,12 @@ class WaveformProcessor(object):
         """
         Computes the length of the spectrogram given the length
         of the waveform
+
+        Args:
+            waveform_lengths: the number of samples of the waveform
+
+        Returns:
+            int: the number of time samples in the spectrogram
         """
         return waveform_length//self.nstep+1
 
@@ -153,8 +174,8 @@ class WaveformProcessor(object):
         Returns:
             spectrograms(torch.Tensor): (B, Tx//nstep + 1, n_mels)
         """
-        # spectrograms is (B, n_mel, Tx)
-        # we permute it to be (B, Tx, n_mel)
+        # spectrograms is (B, n_mel, T)
+        # we permute it to be (B, T, n_mel)
         return self.transform(waveforms).permute(0, 2, 1)
 
 
@@ -215,11 +236,9 @@ class BatchCollate(object):
         # Pad the waveforms to the longest waveform
         # so that we can process them as a batch through the transform
         waveforms = pad_sequence([t.squeeze() for t in waveforms],
-                                 batch_first=True)
+                                 batch_first=True)  # (batch, time)
 
-        spectrograms = self.waveform_processor(waveforms)
-
-        # spectrograms is (B, Tx, n_mels)
+        spectrograms = self.waveform_processor(waveforms)  # (batch, time, n_mels)
         spectrograms = pack_padded_sequence(spectrograms,
                                             lengths=spectro_lengths,
                                             batch_first=True)
@@ -322,8 +341,6 @@ def plot_spectro(spectrogram: torch.Tensor,
     ax.set_title('{}'.format(charmap.decode(transcript)))
     plt.colorbar(im)
     plt.tight_layout()
-    plt.savefig('spectro.png')
-    plt.show()
 
 
 if __name__ == '__main__':
@@ -336,6 +353,13 @@ if __name__ == '__main__':
                                                               cuda=False,
                                                               n_threads=4,
                                                               batch_size=batch_size)
+    charmap = CharMap()
+
+    # Some encoding/decoding tests
+    utterance = "Je vais m'éclater avec des RNNs !"
+    encoded = charmap.encode(utterance)
+    decoded = charmap.decode(encoded)
+    print(f"\"{utterance}\" -> \"{encoded}\" -> \"{decoded}\" ")
 
     X, y = next(iter(train_loader))
     # X is (batch_size, Tx, n_mels)
@@ -343,15 +367,9 @@ if __name__ == '__main__':
     # Y is (batch_size, Ty)
     y, lens_y = pad_packed_sequence(y, batch_first=True)
 
-    charmap = CharMap()
+    print("Some decoder texts from the LongTensors")
     for yi, li in zip(y, lens_y):
         print(charmap.decode(yi)[:li])
-
-
-    idx = 0
-    plot_spectro(X[idx, ...], y[idx, :lens_y[idx]], _DEFAULT_WIN_STEP*1e-3,
-                charmap)
-
 
     fig, axes = plt.subplots(nrows=batch_size,
                              ncols=1, sharex=True,
@@ -371,6 +389,32 @@ if __name__ == '__main__':
     fig.colorbar(im, ax=axes.ravel().tolist())
     plt.xlabel('Time (s.)')
     plt.savefig('spectro.png')
+
+    # From the validation set
+    X, y = next(iter(valid_loader))
+    # X is (batch_size, Tx, n_mels)
+    X, lens_X = pad_packed_sequence(X, batch_first=True)
+    # Y is (batch_size, Ty)
+    y, lens_y = pad_packed_sequence(y, batch_first=True)
+    idx = 1
+    plot_spectro(X[idx, ...], y[idx, :lens_y[idx]],
+                 _DEFAULT_WIN_STEP*1e-3,
+                 charmap)
+    plt.savefig('spectro_valid.png')
+
+    # From the validation set
+    X, y = next(iter(train_loader))
+    # X is (batch_size, Tx, n_mels)
+    X, lens_X = pad_packed_sequence(X, batch_first=True)
+    # Y is (batch_size, Ty)
+    y, lens_y = pad_packed_sequence(y, batch_first=True)
+    idx = 0
+    print(X.shape, _DEFAULT_WIN_STEP*1e-3)
+    plot_spectro(X[idx, ...], y[idx, :lens_y[idx]],
+                 _DEFAULT_WIN_STEP*1e-3,
+                 charmap)
+    plt.savefig('spectro_train.png')
+
     plt.show()
 
     print(charmap.decode(charmap.encode("nous sommes heureux de vous souhaiter nos meilleurs vœux pour 2015")))
