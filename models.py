@@ -29,37 +29,16 @@ class CTCModel(nn.Module):
         self.n_mels = n_mels
         self.num_hidden = num_hidden
         self.num_layers = num_layers
-        # self.cnn = nn.Sequential(
-        #     nn.Conv1d(in_channels=n_mels,
-        #               out_channels=32,
-        #               kernel_size=3,
-        #               stride=1,
-        #               padding=1),
-        #     nn.ReLU(),
-        #     *([nn.Conv1d(32, 32, 3, 1, 1), nn.ReLU()]*3)
-        # )
+
         self.rnn = nn.GRU(self.n_mels,
                           self.num_hidden,
                           num_layers=num_layers,
                           batch_first=self.batch_first,
                           bidirectional=True)
-        self.charlin = nn.Sequential(
-            nn.Linear(2*self.num_hidden, self.num_hidden),
-            nn.ReLU(),
-            nn.Linear(self.num_hidden, charmap.vocab_size + 1)  # add the blank
-        )
+        self.charlin = nn.Linear(2*self.num_hidden, charmap.vocab_size + 1)  # add the blank
 
     def forward(self,
                 inputs: PackedSequence) -> PackedSequence:
-
-        # Unpack the input : (batch, time, n_mels)
-
-        # unpacked_inputs, lens_inputs = pad_packed_sequence(inputs,
-        #                                                    batch_first=True)
-        # # Transpose time and n_mels dimensions to be (batch, chan_in, time)
-        # unpacked_inputs = unpacked_inputs.transpose(1, 2)
-        # out_cnn = self.cnn(unpacked_inputs)  # batch, 32, seq_len
-        # out_cnn = out_cnn.transpose(1, 2)  # batch, seq_len, 32
 
         # Go through the RNN
         packed_outrnn, _ = self.rnn(inputs)  # batch, seq, num_hidden
