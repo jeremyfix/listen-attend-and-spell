@@ -255,6 +255,7 @@ def get_dataloaders(commonvoice_root: str,
                     batch_size: int = 64,
                     n_threads: int = 4,
                     small_experiment:bool = False,
+                    train_augment:bool = False,
                     nmels: int = _DEFAULT_NUM_MELS):
     """
     Build and return the pytorch dataloaders
@@ -268,6 +269,7 @@ def get_dataloaders(commonvoice_root: str,
         batch_size (int) : the number of samples per minibatch
         n_threads (int) : the number of threads to use for dataloading
         small_experiment (bool) : whether or not to use small subsets, usefull for debug
+        train_augment (bool) : whether to use SpecAugment
         nmels (int) : the number of mel scales to consider
     """
     dataset_loader = functools.partial(load_dataset,
@@ -285,7 +287,7 @@ def get_dataloaders(commonvoice_root: str,
         test_dataset = torch.utils.data.Subset(test_dataset,
                                                indices=indices)
 
-    batch_collate_train_fn = BatchCollate(nmels, augment=True)
+    batch_collate_train_fn = BatchCollate(nmels, augment=train_augment)
     batch_collate_infer_fn = BatchCollate(nmels, augment=False)
 
     train_loader = torch.utils.data.DataLoader(train_dataset,
@@ -347,7 +349,8 @@ if __name__ == '__main__':
                                                               _DEFAULT_COMMONVOICE_VERSION,
                                                               cuda=False,
                                                               n_threads=4,
-                                                              batch_size=batch_size)
+                                                              batch_size=batch_size,
+                                                              train_augment=True)
     charmap = CharMap()
 
     # Some encoding/decoding tests

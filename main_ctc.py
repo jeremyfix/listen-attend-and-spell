@@ -62,7 +62,8 @@ def train(args):
                                                                    batch_size=args.batch_size,
                                                                    n_threads=args.nthreads,
                                                                    small_experiment=args.debug,
-                                                                   nmels=args.nmels)
+                                                                   nmels=args.nmels,
+                                                                  train_augment=args.train_augment)
     # We need the char map to know about the vocabulary size
     charmap = data.CharMap()
 
@@ -219,6 +220,9 @@ if __name__ == '__main__':
                         type=int,
                         help="The number of epochs to train for",
                         default=50)
+    parser.add_argument("--train_augment",
+                        action="store_true",
+                        help="Whether to use or not SpecAugment during training")
     parser.add_argument("--nmels",
                         type=int,
                         help="The number of scales in the MelSpectrogram",
