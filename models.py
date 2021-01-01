@@ -73,10 +73,11 @@ class CTCModel(nn.Module):
             if batch_size != 1:
                 raise NotImplementedError("Can decode only one batch at a time")
 
-            outputs = unpacked_outputs.squeeze(dim=0).log_softmax(dim=1)
+            unpacked_outputs = unpacked_outputs.squeeze(dim=0)  # seq, vocab_size
+            outputs = unpacked_outputs.log_softmax(dim=1)
             top_values, top_indices = outputs.topk(k=1, dim=1)
 
-            prob = outputs.sum().item()
+            prob = top_values.sum().item()
             seq = [ci for ci in top_indices if ci != self.charmap.vocab_size]
             # Drop out every blank
             return [(prob, self.charmap.decode(seq))]
