@@ -13,6 +13,7 @@ import torch.utils.data
 import torchaudio
 from torchaudio.datasets import COMMONVOICE
 from torchaudio.transforms import Spectrogram, AmplitudeToDB, MelScale, MelSpectrogram, FrequencyMasking, TimeMasking
+import matplotlib.pyplot as plt
 
 _DEFAULT_COMMONVOICE_ROOT = "/opt/Datasets/CommonVoice/"
 _DEFAULT_COMMONVOICE_VERSION = "v1"
@@ -340,8 +341,89 @@ def plot_spectro(spectrogram: torch.Tensor,
     plt.tight_layout()
 
 
-if __name__ == '__main__':
-    import matplotlib.pyplot as plt
+def ex_charmap():
+    charmap = CharMap()
+
+    # Some encoding/decoding tests
+    utterance = "Je vais m'éclater avec des RNNs !"
+    encoded = charmap.encode(utterance)
+    decoded = charmap.decode(encoded)
+    print(f"\"{utterance}\" -> \"{encoded}\" -> \"{decoded}\" ")
+
+    # For some reasons, the replacement of œ fails
+    print(charmap.decode(charmap.encode("nous sommes heureux de vous souhaiter nos meilleurs vœux pour 2021")))
+    print('œ' in charmap.char2idx)
+
+    print(f"The vocabulary contains {charmap.vocab_size} characters")
+
+def ex_waveform_spectro():
+    dataset = load_dataset("train",
+                           _DEFAULT_COMMONVOICE_ROOT,
+                           _DEFAULT_COMMONVOICE_VERSION)
+
+    # Take one of the waveforms 
+    idx = 10
+    waveform, rate, dictionary = dataset[idx]
+    n_begin = rate  # 1 s.
+    n_end = 3*rate  # 2 s.
+    waveform = waveform[:, n_begin:n_end]
+
+    nfft = int(_DEFAULT_WIN_LENGTH * 1e-3 * _DEFAULT_RATE)
+    nmels = _DEFAULT_NUM_MELS
+    nstep = int(_DEFAULT_WIN_STEP * 1e-3 * _DEFAULT_RATE)
+    trans_spectro = nn.Sequential(
+        Spectrogram(n_fft=nfft,
+                       hop_length=nstep),
+        AmplitudeToDB()
+    )
+    spectro = trans_spectro(waveform)  # batch, seq_len, nfs
+
+    trans_mel_spectro = nn.Sequential(
+        MelSpectrogram(sample_rate=rate,
+                       n_fft=nfft,
+                       hop_length=nstep,
+                       n_mels=nmels),
+        AmplitudeToDB()
+    )
+    mel_spectro = trans_mel_spectro(waveform)
+
+    fig, axes = plt.subplots(nrows=1,ncols=3, figsize=(15, 3))
+
+    ax = axes[0]
+    ax.plot( [i/rate for i in range(n_begin, n_end)], waveform[0])
+    ax.set_xlabel('Time (s.)')
+    ax.set_ylabel('Amplitude')
+    ax.set_title('Waveform')
+
+    ax = axes[1]
+    im = ax.imshow(spectro[0],
+                   extent=[n_begin/rate, n_end/rate,
+                           0, spectro.shape[1]],
+                   aspect='auto',
+                   cmap='magma',
+                   origin='lower')
+    ax.set_ylabel('Frequency bins')
+    ax.set_xlabel('TIme (s.)')
+    fig.colorbar(im, ax=ax)
+
+    ax = axes[2]
+    im = ax.imshow(mel_spectro[0],
+                   extent=[n_begin/rate, n_end/rate,
+                           0, mel_spectro.shape[1]],
+                   aspect='auto',
+                   cmap='magma',
+                   origin='lower')
+    ax.set_ylabel('Mel scales')
+    ax.set_xlabel('TIme (s.)')
+    fig.colorbar(im, ax=ax)
+
+    plt.tight_layout()
+    plt.savefig("waveform_to_spectro.png")
+    plt.show()
+
+def ex_spectro():
+
+    charmap = CharMap()
 
     # Data loading
     batch_size = 4
@@ -351,14 +433,6 @@ if __name__ == '__main__':
                                                               n_threads=4,
                                                               batch_size=batch_size,
                                                               train_augment=True)
-    charmap = CharMap()
-
-    # Some encoding/decoding tests
-    utterance = "Je vais m'éclater avec des RNNs !"
-    encoded = charmap.encode(utterance)
-    decoded = charmap.decode(encoded)
-    print(f"\"{utterance}\" -> \"{encoded}\" -> \"{decoded}\" ")
-
     X, y = next(iter(train_loader))
     # X is (batch_size, Tx, n_mels)
     X, lens_X = pad_packed_sequence(X, batch_first=True)
@@ -388,6 +462,17 @@ if __name__ == '__main__':
     plt.xlabel('Time (s.)')
     plt.savefig('spectro.png')
 
+def ex_augmented_spectro():
+    charmap = CharMap()
+
+    # Data loading
+    batch_size = 4
+    train_loader, valid_loader, test_loader = get_dataloaders(_DEFAULT_COMMONVOICE_ROOT,
+                                                              _DEFAULT_COMMONVOICE_VERSION,
+                                                              cuda=False,
+                                                              n_threads=4,
+                                                              batch_size=batch_size,
+                                                              train_augment=True)
     # From the validation set
     X, y = next(iter(valid_loader))
     # X is (batch_size, Tx, n_mels)
@@ -415,7 +500,9 @@ if __name__ == '__main__':
 
     plt.show()
 
-    print(charmap.decode(charmap.encode("nous sommes heureux de vous souhaiter nos meilleurs vœux pour 2015")))
-    print('œ' in charmap.char2idx)
 
-    print(f"The vocabulary contains {charmap.vocab_size} characters")
+if __name__ == '__main__':
+    # ex_charmap()
+    ex_waveform_spectro()
+    # ex_spectro()
+    # ex_augmented_spectro()
