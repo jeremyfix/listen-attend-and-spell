@@ -30,10 +30,21 @@ class CTCModel(nn.Module):
         self.num_hidden = num_hidden
         self.num_layers = num_layers
 
-        self.rnn = nn.LSTM(self.n_mels,
+        self.cnn = nn.Sequential(
+            nn.Conv1d(in_channels=n_mels,
+                      out_channels=32,
+                      kernel_size=3,
+                      stride=1,
+                      padding=1),
+            nn.ReLU(),
+            *([nn.Conv1d(32, 32, 3, 1, 1), nn.ReLU()]*3),
+            nn.Dropout(0.5),
+        )
+        self.rnn = nn.LSTM(32,
                            self.num_hidden,
                            num_layers=num_layers,
                            batch_first=self.batch_first,
+                           dropout=0.5,
                            bidirectional=True)
         # self.rnn = nn.GRU(self.n_mels,
         #                   self.num_hidden,
@@ -45,11 +56,21 @@ class CTCModel(nn.Module):
     def forward(self,
                 inputs: PackedSequence) -> PackedSequence:
 
+        # Go through the CNN
+        unpacked_inputs, lens_inputs = pad_packed_sequence(inputs,
+                                                           batch_first=True)
+        # unpacked_inputs is (batch, seq_len, num_mels)
+        out_cnn = self.cnn(unpacked_inputs.transpose(1, 2)).transpose(1, 2)
+        # pack the cnn output, given there is no downsampling in the cnn
+        # the lenghts are the same
+        packed_cnn = pack_padded_sequence(out_cnn, lengths=lens_inputs,
+                                          batch_first=True)
+
         # Go through the RNN
-        packed_outrnn, _ = self.rnn(inputs)  # batch, seq, num_hidden
+        packed_outrnn, _ = self.rnn(packed_cnn)  # batch, seq, num_hidden
 
         unpacked_outrnn, lens_outrnn = pad_packed_sequence(packed_outrnn,
-                                                          batch_first=True)
+                                                           batch_first=True)
 
         # Go through the next char predictor
         out_lin = self.charlin(unpacked_outrnn)
