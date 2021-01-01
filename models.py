@@ -42,8 +42,11 @@ class CTCModel(nn.Module):
                           self.num_hidden,
                           num_layers=num_layers,
                           batch_first=self.batch_first)
-        self.charlin = nn.Linear(self.num_hidden,
-                                 charmap.vocab_size + 1)  # add the blank
+        self.charlin = nn.Sequential(
+            nn.Linear(self.num_hidden, self.num_hidden),
+            nn.ReLU(),
+            nn.Linear(self.num_hidden, charmap.vocab_size + 1)  # add the blank
+        )
 
     def forward(self,
                 inputs: PackedSequence) -> PackedSequence:
