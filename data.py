@@ -404,6 +404,7 @@ def ex_waveform_spectro():
                    origin='lower')
     ax.set_ylabel('Frequency bins')
     ax.set_xlabel('TIme (s.)')
+    ax.set_title("Spectrogram (dB)")
     fig.colorbar(im, ax=ax)
 
     ax = axes[2]
@@ -415,6 +416,7 @@ def ex_waveform_spectro():
                    origin='lower')
     ax.set_ylabel('Mel scales')
     ax.set_xlabel('TIme (s.)')
+    ax.set_title("Mel-Spectrogram (dB)")
     fig.colorbar(im, ax=ax)
 
     plt.tight_layout()
