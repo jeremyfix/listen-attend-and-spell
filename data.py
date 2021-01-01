@@ -121,28 +121,34 @@ class CharMap(object):
 class WaveformProcessor(object):
 
     def __init__(self,
+                 rate: float,
+                 win_length: float,
+                 win_step: float,
                  nmels: int,
                  augment: bool):
         """
         Args:
+            rate: the sampling rate of the waveform
+            win_length: the length in ms of the window for the STFT
+            win_step: the length in ms of the step size of the STFT window
             nmels:  the number of mel scales to consider
             augment (bool) : whether to use data augmentation or not
         """
-        nfft = int(_DEFAULT_WIN_LENGTH * 1e-3 * _DEFAULT_RATE)
+        self.nfft = int(win_length * rate)
         # We need to memorize nstep since it is the downscaling
         # factor from the waveform to the spectrogram
-        self.nstep = int(_DEFAULT_WIN_STEP * 1e-3 * _DEFAULT_RATE)
+        self.nstep = int(win_step * rate)
         modules = [
-            MelSpectrogram(sample_rate=_DEFAULT_RATE,
-                           n_fft=nfft,
+            MelSpectrogram(sample_rate=rate,
+                           n_fft=self.nfft,
                            hop_length=self.nstep,
                            n_mels=nmels),
             AmplitudeToDB()
         ]
 
-        time_mask_duration = 0.5 # s.
-        time_mask_nsamples = int(time_mask_duration / (_DEFAULT_WIN_STEP * 1e-3))
-        nmel_mask = 27
+        time_mask_duration = 0.5  # s.
+        time_mask_nsamples = int(time_mask_duration / win_step)
+        nmel_mask = nmels//3
 
         if augment:
             modules.extend([
@@ -193,7 +199,13 @@ class BatchCollate(object):
             nmels (int) : the number of mel scales to consider
             augment (bool) : whether to use data augmentation or not
         """
-        self.waveform_processor = WaveformProcessor(nmels, augment)
+        self.waveform_processor = WaveformProcessor(
+            _DEFAULT_RATE,
+            _DEFAULT_WIN_LENGTH*1e-3,
+            _DEFAULT_WIN_STEP*1e-3,
+            nmels,
+            augment
+        )
         self.charmap = CharMap()
 
     def __call__(self, batch):
@@ -378,14 +390,15 @@ def ex_waveform_spectro():
     )
     spectro = trans_spectro(waveform)  # batch, seq_len, nfs
 
-    trans_mel_spectro = nn.Sequential(
-        MelSpectrogram(sample_rate=rate,
-                       n_fft=nfft,
-                       hop_length=nstep,
-                       n_mels=nmels),
-        AmplitudeToDB()
-    )
+    trans_mel_spectro = WaveformProcessor(rate=rate,
+                                          win_length=_DEFAULT_WIN_LENGTH*1e-3,
+                                          win_step=_DEFAULT_WIN_STEP*1e-3,
+                                          nmels=_DEFAULT_NUM_MELS,
+                                          augment=False)
     mel_spectro = trans_mel_spectro(waveform)
+    plot_spectro(mel_spectro[0, ...], [],
+                 _DEFAULT_WIN_STEP*1e-3,
+                 CharMap())
 
     fig, axes = plt.subplots(nrows=1,ncols=3, figsize=(15, 3))
 
@@ -408,9 +421,9 @@ def ex_waveform_spectro():
     fig.colorbar(im, ax=ax)
 
     ax = axes[2]
-    im = ax.imshow(mel_spectro[0],
+    im = ax.imshow(mel_spectro[0].T,
                    extent=[n_begin/rate, n_end/rate,
-                           0, mel_spectro.shape[1]],
+                           0, mel_spectro.shape[0]],
                    aspect='auto',
                    cmap='magma',
                    origin='lower')
