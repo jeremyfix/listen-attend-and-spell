@@ -6,6 +6,7 @@ import os
 import sys
 import logging
 import argparse
+import functools
 from pathlib import Path
 # External imports
 import torch
@@ -28,6 +29,19 @@ import matplotlib.pyplot as plt
 import data
 import models
 
+
+def wrap_ctc_args(packed_predictions, packed_targets):
+    """
+    Returns:
+        log_softmax predictions, targets, lens_predictions, lens_targets
+    """
+    unpacked_predictions, lens_predictions = pad_packed_sequence(packed_predictions,
+                                                                 batch_first=True)
+
+    unpacked_targets, lens_targets = pad_packed_sequence(packed_targets,
+                                                        batch_first=True)
+
+    return unpacked_predictions.log_softmax(dim=2).transpose(0, 1), unpacked_targets, lens_predictions, lens_targets
 
 def wrap_args(packed_predictions, packed_targets):
     """
@@ -103,24 +117,34 @@ def train(args):
     n_hidden_spell = args.nhidden_spell
     n_layers_decoder = args.nlayers_decoder
     dim_embed = args.dim_embed
-    model = models.Seq2Seq(n_mels,
-                           charmap,
-                           n_hidden_listen,
-                           n_layers_encoder,
-                           dim_embed,
-                           n_hidden_spell,
-                           n_layers_decoder,
-                           args.teacher_forcing)
+
+    num_model_args = 1
+    model = models.CTCModel(charmap, n_mels, n_hidden_listen, n_layers_encoder)
+    decode = model.decode
+
+    # num_model_args = 2
+    # model = models.Seq2Seq(n_mels,
+    #                        charmap,
+    #                        n_hidden_listen,
+    #                        n_layers_encoder,
+    #                        dim_embed,
+    #                        n_hidden_spell,
+    #                        n_layers_decoder,
+    #                        args.teacher_forcing)
+    # decode = functools.partial(model.decode, args.beamwidth, args.maxlength)
+
     model.to(device)
 
     # Loss, optimizer
-    baseloss = nn.CrossEntropyLoss()
-    celoss = lambda *args: baseloss(* wrap_args(*args))
+    # baseloss = nn.CrossEntropyLoss()
+    # loss = lambda *args: baseloss(* wrap_args(*args))
+    baseloss = nn.CTCLoss(blank=charmap.vocab_size)
+    loss = lambda *args: baseloss(* wrap_ctc_args(*args))
     accuracy = lambda *args: deepcs.metrics.accuracy(* wrap_args(*args))
     optimizer = optim.Adam(model.parameters())
 
     metrics = {
-        'CE': celoss,
+        'CE': loss,
         'accuracy': accuracy
     }
 
@@ -153,12 +177,12 @@ def train(args):
 
         ftrain(model,
                train_loader,
-               celoss,
+               loss,
                optimizer,
                device,
                metrics,
                grad_clip=args.grad_clip,
-               num_model_args=2,
+               num_model_args=num_model_args,
                num_epoch=e,
                tensorboard_writer=tensorboard_writer)
 
@@ -167,7 +191,7 @@ def train(args):
                               valid_loader,
                               device,
                               metrics,
-                              num_model_args=2)
+                              num_model_args=num_model_args)
         better_model = model_checkpoint.update(valid_metrics['CE'])
         scheduler.step()
 
@@ -186,7 +210,7 @@ def train(args):
                              test_loader,
                              device,
                              metrics,
-                             num_model_args=2)
+                             num_model_args=num_model_args)
         logger.info("[%d/%d] Test:   Loss : %.3f | Acc : %.3f%%"% (e,
                                                                    args.num_epochs,
                                                                    test_metrics['CE'],
@@ -214,9 +238,7 @@ def train(args):
             transcript = unpacked_transcripts[idxv, :].unsqueeze(dim=0)
             transcript = pack_padded_sequence(transcript, batch_first=True,
                                               lengths=[lens_transcripts[idxv]])
-            likely_sequences = model.decode(args.beamwidth,
-                                            args.maxlength,
-                                            spectrogram)
+            likely_sequences = decode(spectrogram)
 
             decoding_results += "\nGround truth : " + charmap.decode(unpacked_transcripts[idxv]) + '\n'
             decoding_results += "Log prob     Sequence\n"

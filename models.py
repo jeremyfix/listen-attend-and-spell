@@ -9,6 +9,88 @@ from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence, Packed
 # Local imports
 import data
 
+class CTCModel(nn.Module):
+
+    def __init__(self,
+                 charmap: data.CharMap,
+                 n_mels: int,
+                 num_hidden: int,
+                 num_layers: int):
+        """
+        Args:
+            charmap (data.Charmap) : the character/int map
+            n_mels (int) : number of input mel scales
+            num_hidden (int): number of LSTM cells per layer and per direction
+            num_layers (int) : number of stacked RNN layers
+        """
+        super(CTCModel, self).__init__()
+        self.batch_first = True
+        self.charmap = charmap
+        self.n_mels = n_mels
+        self.num_hidden = num_hidden
+        self.num_layers = num_layers
+        self.cnn = nn.Sequential(
+            nn.Conv1d(in_channels=n_mels,
+                      out_channels=32,
+                      kernel_size=3,
+                      stride=1,
+                      padding=1),
+            nn.ReLU(),
+            *([nn.Conv1d(32, 32, 3, 1, 1), nn.ReLU()]*3)
+        )
+        self.rnn = nn.GRU(32,
+                          self.num_hidden,
+                          num_layers=num_layers,
+                          batch_first=self.batch_first)
+        self.charlin = nn.Linear(self.num_hidden,
+                                 charmap.vocab_size + 1)  # add the blank
+
+    def forward(self,
+                inputs: PackedSequence) -> PackedSequence:
+
+        # Unpack the input : (batch, time, n_mels)
+
+        unpacked_inputs, lens_inputs = pad_packed_sequence(inputs,
+                                                           batch_first=True)
+        # Transpose time and n_mels dimensions to be (batch, chan_in, time)
+        unpacked_inputs = unpacked_inputs.transpose(1, 2)
+        out_cnn = self.cnn(unpacked_inputs)  # batch, 32, seq_len
+        out_cnn = out_cnn.transpose(1, 2)  # batch, seq_len, 32
+
+        # Go through the RNN
+        out_rnn, _ = self.rnn(out_cnn)  # batch, seq, num_hidden
+
+        # Go through the next char predictor
+        out_lin = self.charlin(out_rnn)
+
+        # Repack the result
+        outputs = pack_padded_sequence(out_lin,
+                                       lengths=lens_inputs,
+                                       batch_first=True)
+        return outputs
+
+    def decode(self,
+               inputs: PackedSequence) -> PackedSequence:
+        """
+        Greedy decoder
+        """
+        with torch.no_grad():
+            outputs = self.forward(inputs)  # packed batch, seq, num_char
+            unpacked_outputs, lens_outputs = pad_packed_sequence(outputs,
+                                                                 batch_first=True)
+            batch_size, seq_len, num_char = unpacked_outputs.shape
+            if batch_size != 1:
+                raise NotImplementedError("Can decode only one batch at a time")
+
+            outputs = unpacked_outputs.squeeze(dim=0).log_softmax(dim=1)
+            top_values, top_indices = outputs.topk(k=1, dim=1)
+
+            prob = outputs.sum().item()
+            seq = [ci for ci in top_indices if ci != self.charmap.vocab_size]
+            # Drop out every blank
+            return [(prob, self.charmap.decode(seq))]
+
+
 class Encoder(nn.Module):
 
     def __init__(self,
