@@ -106,7 +106,7 @@ class CharMap(object):
         return chr(self._SOS)
 
     def encode(self, utterance):
-        utterance = utterance.lower()
+        utterance = self.soschar + utterance.lower() + self.eoschar
         # Remove the accentuated characters
         utterance = [self.equivalent_char[c] if c in self.equivalent_char else c for c in utterance]
         # Replace the unknown characters
@@ -208,13 +208,8 @@ class BatchCollate(object):
         # Extract the subcomponents
         waveforms = [w for w, _, _ in batch]
         rates = set([r for _, r, _ in batch])
-        transcripts = [
-            torch.LongTensor(
-                self.charmap.encode(self.charmap.soschar +
-                                    d['sentence'] +
-                                    self.charmap.eoschar)
-            )
-            for _, _, d in batch]
+        transcripts = [torch.LongTensor(self.charmap.encode(d['sentence']))
+                       for _, _, d in batch]
 
         if len(rates) != 1:
             # We resample the signal to the _DEFAULT_RATE
