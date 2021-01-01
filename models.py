@@ -30,11 +30,16 @@ class CTCModel(nn.Module):
         self.num_hidden = num_hidden
         self.num_layers = num_layers
 
-        self.rnn = nn.GRU(self.n_mels,
-                          self.num_hidden,
-                          num_layers=num_layers,
-                          batch_first=self.batch_first,
-                          bidirectional=True)
+        self.rnn = nn.LSTM(self.n_mels,
+                           self.num_hidden,
+                           num_layers=num_layers,
+                           batch_first=self.batch_first,
+                           bidirectional=True)
+        # self.rnn = nn.GRU(self.n_mels,
+        #                   self.num_hidden,
+        #                   num_layers=num_layers,
+        #                   batch_first=self.batch_first,
+        #                   bidirectional=True)
         self.charlin = nn.Linear(2*self.num_hidden, charmap.vocab_size + 1)  # add the blank
 
     def forward(self,
