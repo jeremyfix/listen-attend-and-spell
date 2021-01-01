@@ -242,7 +242,7 @@ def get_dataloaders(commonvoice_root: str,
                       on the right device
         batch_size (int) : the number of samples per minibatch
         n_threads (int) : the number of threads to use for dataloading
-        small (bool) : whether or not to use small subsets, usefull for debug
+        small_experiment (bool) : whether or not to use small subsets, usefull for debug
         nmels (int) : the number of mel scales to consider
     """
     dataset_loader = functools.partial(load_dataset,
@@ -283,6 +283,37 @@ def get_dataloaders(commonvoice_root: str,
 
     return train_loader, valid_loader, test_loader
 
+
+def plot_spectro(spectrogram: torch.Tensor,
+                 transcript: torch.Tensor,
+                 win_step: float,
+                 charmap: CharMap) -> None:
+    '''
+    Args:
+        spectrogram (seq_len, n_mels) tensor
+        trancript (target_len, ) LongTensor
+        win_step is the stride of the windows, in seconds, for computing the
+                 spectrogram
+        charmap : object for converting between int and char for the transcripts
+    '''
+    fig = plt.figure(figsize=(10, 2))
+    ax = fig.add_subplot()
+
+    im = ax.imshow(spectrogram.T,
+                   extent=[0, spectrogram.shape[0]*win_step,
+                           0, spectrogram.shape[1]],
+                   aspect='auto',
+                   cmap='magma',
+                   origin='lower')
+    ax.set_ylabel('Mel scale')
+    ax.set_xlabel('TIme (s.)')
+    ax.set_title('{}'.format(charmap.decode(transcript)))
+    plt.colorbar(im)
+    plt.tight_layout()
+    plt.savefig('spectro.png')
+    plt.show()
+
+
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
 
@@ -303,6 +334,12 @@ if __name__ == '__main__':
     charmap = CharMap()
     for yi, li in zip(y, lens_y):
         print(charmap.decode(yi)[:li])
+
+
+    idx = 0
+    plot_spectro(X[idx, ...], y[idx, :lens_y[idx]], _DEFAULT_WIN_STEP*1e-3,
+                charmap)
+
 
     fig, axes = plt.subplots(nrows=batch_size,
                              ncols=1, sharex=True,
