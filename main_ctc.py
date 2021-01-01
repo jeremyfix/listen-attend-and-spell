@@ -216,7 +216,7 @@ if __name__ == '__main__':
     parser.add_argument("--num_epochs",
                         type=int,
                         help="The number of epochs to train for",
-                        default=10)
+                        default=50)
     parser.add_argument("--nmels",
                         type=int,
                         help="The number of scales in the MelSpectrogram",

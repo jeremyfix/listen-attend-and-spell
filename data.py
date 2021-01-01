@@ -12,7 +12,7 @@ from torch.nn.utils.rnn import pad_sequence, pack_padded_sequence, pad_packed_se
 import torch.utils.data
 import torchaudio
 from torchaudio.datasets import COMMONVOICE
-from torchaudio.transforms import Spectrogram, AmplitudeToDB, MelScale, MelSpectrogram
+from torchaudio.transforms import Spectrogram, AmplitudeToDB, MelScale, MelSpectrogram, FrequencyMasking, TimeMasking
 
 _DEFAULT_COMMONVOICE_ROOT = "/opt/Datasets/CommonVoice/"
 _DEFAULT_COMMONVOICE_VERSION = "v1"
@@ -124,7 +124,9 @@ class WaveformProcessor(object):
                            n_fft=nfft,
                            hop_length=self.nstep,
                            n_mels=nmels),
-            AmplitudeToDB()
+            AmplitudeToDB(),
+            FrequencyMasking(27),
+            TimeMasking(100)
         )
 
     def get_spectro_length(self, waveform_length: int):
