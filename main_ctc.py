@@ -122,7 +122,7 @@ def train(args):
                               device,
                               metrics,
                               num_model_args=num_model_args)
-        better_model = model_checkpoint.update(valid_metrics['CE'])
+        better_model = model_checkpoint.update(valid_metrics['CTC'])
         scheduler.step()
 
         logger.info("[%d/%d] Validation:   CTCLoss : %.3f %s"% (e,
