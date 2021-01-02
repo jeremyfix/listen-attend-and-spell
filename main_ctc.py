@@ -81,8 +81,7 @@ def train(args):
     # Loss, optimizer
     baseloss = nn.CTCLoss(blank=charmap.vocab_size)
     loss = lambda *args: baseloss(* wrap_ctc_args(*args))
-    optimizer = optim.AdamW(model.parameters(),
-                            weight_decay=args.weight_decay)
+    optimizer = optim.Adam(model.parameters(), lr=args.base_lr)
 
     metrics = {
         'CTC': loss
@@ -209,6 +208,10 @@ if __name__ == '__main__':
                        type=int,
                        help="The size of the minibatch",
                        default=64)
+    parser.add_argument("--base_lr",
+                        type=float,
+                        help="The base learning rate for the optimizer",
+                        default=0.001)
     parser.add_argument("--grad_clip",
                         type=float,
                         help="The maxnorm of the gradient to clip to",
