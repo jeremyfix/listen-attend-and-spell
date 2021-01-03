@@ -72,7 +72,7 @@ class CharMap(object):
             c: idx for (idx, c) in enumerate(self.idx2char)
         }
 
-        # self.equivalent_char = {}
+        self.equivalent_char = {}
         # for i in range(224, 229):
         #     self.equivalent_char[chr(i)] = 'a'
         # for i in range(232, 236):
