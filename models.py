@@ -228,7 +228,7 @@ class CTCModel(nn.Module):
             # Decode the list of integers
             seq = self.charmap.decode(best[0])
 
-            return [(-logsumexp(*best[1]), best[0])]
+            return [(-logsumexp(*best[1]), seq)]
 
 
 class Encoder(nn.Module):
