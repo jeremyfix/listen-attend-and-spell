@@ -72,17 +72,17 @@ class CharMap(object):
             c: idx for (idx, c) in enumerate(self.idx2char)
         }
 
-        self.equivalent_char = {}
-        for i in range(224, 229):
-            self.equivalent_char[chr(i)] = 'a'
-        for i in range(232, 236):
-            self.equivalent_char[chr(i)] = 'e'
-        for i in range(236, 240):
-            self.equivalent_char[chr(i)] = 'i'
-        for i in range(242, 247):
-            self.equivalent_char[chr(i)] = 'o'
-        for i in range(249, 253):
-            self.equivalent_char[chr(i)] = 'u'
+        # self.equivalent_char = {}
+        # for i in range(224, 229):
+        #     self.equivalent_char[chr(i)] = 'a'
+        # for i in range(232, 236):
+        #     self.equivalent_char[chr(i)] = 'e'
+        # for i in range(236, 240):
+        #     self.equivalent_char[chr(i)] = 'i'
+        # for i in range(242, 247):
+        #     self.equivalent_char[chr(i)] = 'o'
+        # for i in range(249, 253):
+        #     self.equivalent_char[chr(i)] = 'u'
         # Remove the punctuation marks
         for c in ['!', '?', ';']:
             self.equivalent_char[c] = '.'
@@ -91,7 +91,7 @@ class CharMap(object):
         self.equivalent_char['—'] = ''
         # This 'œ' in self.equivalent_char returns False... why ?
         # self.equivalent_char['œ'] = 'oe'
-        self.equivalent_char['ç'] = 'c'
+        # self.equivalent_char['ç'] = 'c'
         self.equivalent_char['’'] = '\''
 
     @property
