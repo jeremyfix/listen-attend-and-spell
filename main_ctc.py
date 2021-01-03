@@ -6,6 +6,7 @@ import os
 import sys
 import logging
 import argparse
+import functools
 from pathlib import Path
 # External imports
 import torch
@@ -71,15 +72,17 @@ def train(args):
     n_mels = args.nmels
     n_hidden_rnn = args.nhidden_rnn
     n_layers_rnn = args.nlayers_rnn
+    blank_id = charmap.vocab_size
 
     num_model_args = 1
     model = models.CTCModel(charmap, n_mels, n_hidden_rnn, n_layers_rnn)
-    decode = model.decode
+    decode = functools.partial(model.beam_decode, beam_size=10,
+                               blank_id=blank_id)
 
     model.to(device)
 
     # Loss, optimizer
-    baseloss = nn.CTCLoss(blank=charmap.vocab_size)
+    baseloss = nn.CTCLoss(blank=blank_id)
     loss = lambda *args: baseloss(* wrap_ctc_args(*args))
     optimizer = optim.Adam(model.parameters(), lr=args.base_lr)
 
