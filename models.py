@@ -723,3 +723,75 @@ class Model(nn.Module):
                                                      self.charmap,
                                                      transcript)
             return packed_out_decoder
+
+
+def ex_ctc():
+    # The size of our minibatches
+    batch_size = 32
+    # The size of our vocabulary (including the blank character)
+    vocab_size = 44
+    # The class id for the blank token
+    blank_id = 43
+
+    max_spectro_length = 50
+    min_transcript_length = 10
+    max_transcript_length = 30
+
+    # Compute a dummy vector of probabilities over the vocabulary (including the blank)
+    # log_probs is here batch_first, i.e. (Batch, Tx, vocab_size)
+    log_probs = torch.randn(batch_size, max_spectro_length, vocab_size).log_softmax(dim=1)
+    spectro_lengths = torch.randint(low=max_transcript_length,
+                                    high=max_spectro_length,
+                                    size=(batch_size, ))
+
+    # Compute some dummy transcripts
+    # targets is here (batch_size, Ty)
+    targets = torch.randint(low=0, high=vocab_size+1,  # include the blank character
+                            size=(batch_size, max_transcript_length))
+    target_lengths = torch.randint(low=min_transcript_length,
+                                   high=max_transcript_length,
+                                   size=(batch_size, ))
+    loss = torch.nn.CTCLoss(blank=blank_id)
+
+    # The log_probs must be given as (Tx, Batch, vocab_size)
+    vloss = loss(log_probs.transpose(0, 1),
+                 targets,
+                 spectro_lengths,
+                 target_lengths)
+
+    print(f"Our dummy loss equals {vloss}")
+
+def ex_pack():
+    import random
+    from torch.nn.utils.rnn import pad_sequence, pack_padded_sequence, pad_packed_sequence
+
+    batch_size = 10
+    n_mels = 80
+    max_length = 512
+    # Given a list of batch_size tensors of variable sizes of shape (Ti, n_mels)
+    tensors = [torch.randn(random.randint(1, max_length), n_mels)for i in range(batch_size)]
+
+    # To be packed, the tensors need to be sorted by
+    # decreasing length
+    tensors = sorted(tensors,
+                     key=lambda tensor: tensor.shape[0],
+                     reverse=True)
+    lengths = [t.shape[0] for t in tensors]
+
+    # We start by padding the sequences to the max_length
+    tensors = pad_sequence(tensors, batch_first=True)
+    # tensors is (batch_size, T, n_mels)
+    # note T is equal to the maximal length of the sequences
+
+    # We can pack the sequence
+    packed_data = pack_padded_sequence(tensors, lengths=lengths,
+                                      batch_first=True)
+
+    # Latter, we can unpack the sequence
+    unpacked_data, lens_data = pad_packed_sequence(packed_data,
+                                                  batch_first=True)
+
+
+if __name__ == '__main__':
+    ex_ctc()
+    ex_pack()
