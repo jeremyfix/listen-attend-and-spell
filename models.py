@@ -224,6 +224,10 @@ class CTCModel(nn.Module):
                 beam = beam[:beam_size]
 
             best = beam[0]
+
+            # Decode the list of integers
+            seq = self.charmap.decode(best[0])
+
             return [(-logsumexp(*best[1]), best[0])]
 
 
