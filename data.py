@@ -5,6 +5,7 @@
 import os
 import functools
 import operator
+import logging
 from pathlib import Path
 from typing import Union, Tuple
 # External imports
@@ -300,7 +301,8 @@ def get_dataloaders(commonvoice_root: str,
                     n_threads: int = 4,
                     small_experiment:bool = False,
                     train_augment:bool = False,
-                    nmels: int = _DEFAULT_NUM_MELS):
+                    nmels: int = _DEFAULT_NUM_MELS,
+                    logger = None):
     """
     Build and return the pytorch dataloaders
 
@@ -315,7 +317,9 @@ def get_dataloaders(commonvoice_root: str,
         small_experiment (bool) : whether or not to use small subsets, usefull for debug
         train_augment (bool) : whether to use SpecAugment
         nmels (int) : the number of mel scales to consider
+        logger : an optional logging logger
     """
+
     dataset_loader = functools.partial(load_dataset,
                                        commonvoice_root=commonvoice_root,
                                        commonvoice_version=commonvoice_version)
@@ -353,6 +357,8 @@ def get_dataloaders(commonvoice_root: str,
     std_spectro = (torch.sqrt(std_spectro)/N_elem).item()
 
     normalization = (mean_spectro, std_spectro)
+    if logger is not None:
+        logger.info(f"Normalization coefficients : {mean_spectro}, {std_spectro}")
 
     batch_collate_train_fn = BatchCollate(nmels,
                                           augment=train_augment,

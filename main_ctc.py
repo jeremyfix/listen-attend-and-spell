@@ -57,14 +57,17 @@ def train(args):
     device = torch.device('cuda') if use_cuda else torch.device('cpu')
 
     # Data loading
-    train_loader, valid_loader, test_loader = data.get_dataloaders(args.datasetroot,
-                                                                   args.datasetversion,
-                                                                   cuda=use_cuda,
-                                                                   batch_size=args.batch_size,
-                                                                   n_threads=args.nthreads,
-                                                                   small_experiment=args.debug,
-                                                                   nmels=args.nmels,
-                                                                  train_augment=args.train_augment)
+    loaders = data.get_dataloaders(args.datasetroot,
+                                   args.datasetversion,
+                                   cuda=use_cuda,
+                                   batch_size=args.batch_size,
+                                   n_threads=args.nthreads,
+                                   small_experiment=args.debug,
+                                   train_augment=args.train_augment,
+                                   nmels=args.nmels,
+                                   logger=logger)
+    train_loader, valid_loader, test_loader = loaders
+
     # We need the char map to know about the vocabulary size
     charmap = data.CharMap()
 
