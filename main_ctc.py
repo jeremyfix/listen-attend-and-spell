@@ -219,7 +219,7 @@ if __name__ == '__main__':
     parser.add_argument("--base_lr",
                         type=float,
                         help="The base learning rate for the optimizer",
-                        default=0.001)
+                        default=0.1)
     parser.add_argument("--grad_clip",
                         type=float,
                         help="The maxnorm of the gradient to clip to",
