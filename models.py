@@ -112,9 +112,10 @@ class CTCModel(nn.Module):
             seq = [ci for ci in top_indices if ci != self.charmap.vocab_size]
 
             # Remove the repetitions
-            last_char = seq[-1]
-            seq = [c1 for c1, c2 in zip(seq[:-1], seq[1:]) if c1 != c2]
-            seq.append(last_char)
+            if len(seq) != 0:
+                last_char = seq[-1]
+                seq = [c1 for c1, c2 in zip(seq[:-1], seq[1:]) if c1 != c2]
+                seq.append(last_char)
 
             # Decode the list of integers
             seq = self.charmap.decode(seq)
