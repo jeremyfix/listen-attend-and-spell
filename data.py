@@ -4,16 +4,18 @@
 # Standard imports
 import os
 import functools
+import operator
 from pathlib import Path
 from typing import Union, Tuple
 # External imports
 import torch.nn as nn
-from torch.nn.utils.rnn import pad_sequence, pack_padded_sequence, pad_packed_sequence
+from torch.nn.utils.rnn import pad_sequence, pack_padded_sequence, pad_packed_sequence, PackedSequence
 import torch.utils.data
 import torchaudio
 from torchaudio.datasets import COMMONVOICE
 from torchaudio.transforms import Spectrogram, AmplitudeToDB, MelScale, MelSpectrogram, FrequencyMasking, TimeMasking
 import matplotlib.pyplot as plt
+import tqdm
 
 _DEFAULT_COMMONVOICE_ROOT = "/opt/Datasets/CommonVoice/"
 _DEFAULT_COMMONVOICE_VERSION = "v1"
@@ -22,6 +24,16 @@ _DEFAULT_WIN_LENGTH = 25  # ms
 _DEFAULT_WIN_STEP = 15  # ms
 _DEFAULT_NUM_MELS = 80
 
+
+def unpack_ravel(tensor: PackedSequence):
+    unpacked_tensor, lens_tensor = pad_packed_sequence(tensor, 
+                                                       batch_first=True)
+    raveled = torch.cat([
+        tensori[:leni] for tensori, leni in zip(unpacked_tensor,
+                                                lens_tensor)
+    ], 0)
+    # raveled is (Tcum, num_features)
+    return raveled
 
 def load_dataset(fold: str,
                  commonvoice_root: Union[str, Path],
@@ -186,19 +198,19 @@ class WaveformProcessor(object):
         Returns:
             spectrograms(torch.Tensor): (B, Tx//nstep + 1, n_mels)
         """
-        # spectrograms is (B, n_mel, T)
-        # we permute it to be (B, T, n_mel)
-
         # Compute the spectorgram
         spectro = self.transform_tospectro(waveforms)
 
         # Normalize the spectrogram
-        #TODO
+        if self.spectro_normalization is not None:
+            spectro = (spectro - self.spectro_normalization[0])/self.spectro_normalization[1]
 
         # Apply data augmentation
         if self.transform_augment is not None:
             spectro = self.transform_augment(spectro)
 
+        # spectrograms is (B, n_mel, T)
+        # we permute it to be (B, T, n_mel)
         return spectro.permute(0, 2, 1)
 
 
@@ -209,7 +221,7 @@ class BatchCollate(object):
 
     def __init__(self,
                  nmels: int,
-                 augment: bool, 
+                 augment: bool,
                  spectro_normalization: Tuple[float, float] = None):
         """
         Args:
@@ -319,8 +331,35 @@ def get_dataloaders(commonvoice_root: str,
         test_dataset = torch.utils.data.Subset(test_dataset,
                                                indices=indices)
 
-    batch_collate_train_fn = BatchCollate(nmels, augment=train_augment)
-    batch_collate_infer_fn = BatchCollate(nmels, augment=False)
+    # Compute the normalization on the training set
+    mean_spectro, std_spectro = 0, 0
+    batch_collate_norm = BatchCollate(nmels, augment=False)
+    norm_loader = torch.utils.data.DataLoader(train_dataset,
+                                              batch_size=batch_size,
+                                              shuffle=True,
+                                              num_workers=n_threads,
+                                              collate_fn=batch_collate_norm,
+                                              pin_memory=cuda)
+    N_elem = 0
+    for spectros, _ in tqdm.tqdm(norm_loader):
+        unpacked_raveled = unpack_ravel(spectros)
+        mean_spectro += unpacked_raveled.sum().item()
+        N_elem = functools.reduce(operator.mul, unpacked_raveled.shape, 1)
+    mean_spectro /= N_elem
+
+    for spectros, _ in tqdm.tqdm(norm_loader):
+        unpacked_raveled = unpack_ravel(spectros)
+        std_spectro += ((unpacked_raveled - mean_spectro)**2).sum()
+    std_spectro = (torch.sqrt(std_spectro)/N_elem).item()
+
+    normalization = (mean_spectro, std_spectro)
+
+    batch_collate_train_fn = BatchCollate(nmels,
+                                          augment=train_augment,
+                                          spectro_normalization=normalization)
+    batch_collate_infer_fn = BatchCollate(nmels,
+                                          augment=False,
+                                          spectro_normalization=normalization)
 
     train_loader = torch.utils.data.DataLoader(train_dataset,
                                                batch_size=batch_size,
