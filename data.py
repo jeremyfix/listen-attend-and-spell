@@ -349,7 +349,6 @@ def get_dataloaders(commonvoice_root: str,
         unpacked_raveled = unpack_ravel(spectros)
         mean_spectro += unpacked_raveled.sum().item()
         N_elem += functools.reduce(operator.mul, unpacked_raveled.shape, 1)
-        print(mean_spectro/N_elem)
     mean_spectro /= N_elem
 
     for spectros, _ in tqdm.tqdm(norm_loader):
