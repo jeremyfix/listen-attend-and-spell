@@ -79,8 +79,9 @@ def train(args):
 
     num_model_args = 1
     model = models.CTCModel(charmap, n_mels, n_hidden_rnn, n_layers_rnn)
-    decode = functools.partial(model.beam_decode, beam_size=10,
-                               blank_id=blank_id)
+    decode = model.decode
+    # decode = functools.partial(model.beam_decode, beam_size=10,
+    #                            blank_id=blank_id)
 
     model.to(device)
 
