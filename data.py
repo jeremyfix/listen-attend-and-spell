@@ -5,7 +5,7 @@
 import os
 import functools
 from pathlib import Path
-from typing import Union
+from typing import Union, Tuple
 # External imports
 import torch.nn as nn
 from torch.nn.utils.rnn import pad_sequence, pack_padded_sequence, pad_packed_sequence
@@ -125,7 +125,8 @@ class WaveformProcessor(object):
                  win_length: float,
                  win_step: float,
                  nmels: int,
-                 augment: bool):
+                 augment: bool,
+                 spectro_normalization: Tuple[float, float]):
         """
         Args:
             rate: the sampling rate of the waveform
@@ -145,17 +146,21 @@ class WaveformProcessor(object):
                            n_mels=nmels),
             AmplitudeToDB()
         ]
+        self.transform_tospectro = nn.Sequential(*modules)
+
+        self.spectro_normalization = spectro_normalization
 
         time_mask_duration = 0.5  # s.
         time_mask_nsamples = int(time_mask_duration / win_step)
         nmel_mask = nmels//3
 
+        self.transform_augment = None
         if augment:
-            modules.extend([
+            modules = [
                 FrequencyMasking(nmel_mask),
                 TimeMasking(time_mask_nsamples)
-            ])
-        self.transform = nn.Sequential(*modules)
+            ]
+            self.transform_augment = nn.Sequential(*modules)
 
     def get_spectro_length(self, waveform_length: int):
         """
@@ -183,7 +188,18 @@ class WaveformProcessor(object):
         """
         # spectrograms is (B, n_mel, T)
         # we permute it to be (B, T, n_mel)
-        return self.transform(waveforms).permute(0, 2, 1)
+
+        # Compute the spectorgram
+        spectro = self.transform_tospectro(waveforms)
+
+        # Normalize the spectrogram
+        #TODO
+
+        # Apply data augmentation
+        if self.transform_augment is not None:
+            spectro = self.transform_augment(spectro)
+
+        return spectro.permute(0, 2, 1)
 
 
 class BatchCollate(object):
@@ -193,18 +209,21 @@ class BatchCollate(object):
 
     def __init__(self,
                  nmels: int,
-                 augment: bool):
+                 augment: bool, 
+                 spectro_normalization: Tuple[float, float] = None):
         """
         Args:
             nmels (int) : the number of mel scales to consider
             augment (bool) : whether to use data augmentation or not
+            spectro_normalization (tuple(float, float)): mean, std
         """
         self.waveform_processor = WaveformProcessor(
             _DEFAULT_RATE,
             _DEFAULT_WIN_LENGTH*1e-3,
             _DEFAULT_WIN_STEP*1e-3,
             nmels,
-            augment
+            augment,
+            spectro_normalization
         )
         self.charmap = CharMap()
 
