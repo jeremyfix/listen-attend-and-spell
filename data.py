@@ -354,7 +354,7 @@ def get_dataloaders(commonvoice_root: str,
     for spectros, _ in tqdm.tqdm(norm_loader):
         unpacked_raveled = unpack_ravel(spectros)
         std_spectro += ((unpacked_raveled - mean_spectro)**2).sum()
-    std_spectro = (torch.sqrt(std_spectro)/N_elem).item()
+    std_spectro = (torch.sqrt(std_spectro/N_elem)).item()
 
     normalization = (mean_spectro, std_spectro)
     if logger is not None:
