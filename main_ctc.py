@@ -110,6 +110,8 @@ def train(args):
     with open(os.path.join(logdir, "summary.txt"), 'w') as f:
         f.write(summary_text)
 
+    logger.info(f">>>>> Results saved in {logdir}")
+
     model_checkpoint = ModelCheckpoint(model,
                                        os.path.join(logdir, 'best_model.pt'))
     scheduler = lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.5)
