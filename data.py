@@ -336,7 +336,6 @@ def get_dataloaders(commonvoice_root: str,
                                                indices=indices)
 
     # Compute the normalization on the training set
-    mean_spectro, std_spectro = 0, 0
     batch_collate_norm = BatchCollate(nmels, augment=False)
     norm_loader = torch.utils.data.DataLoader(train_dataset,
                                               batch_size=batch_size,
@@ -344,6 +343,7 @@ def get_dataloaders(commonvoice_root: str,
                                               num_workers=n_threads,
                                               collate_fn=batch_collate_norm,
                                               pin_memory=cuda)
+    mean_spectro, std_spectro = 0, 0
     N_elem = 0
     for spectros, _ in tqdm.tqdm(norm_loader):
         unpacked_raveled = unpack_ravel(spectros)
