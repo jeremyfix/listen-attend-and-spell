@@ -19,13 +19,15 @@ class CTCModel(nn.Module):
                  charmap: data.CharMap,
                  n_mels: int,
                  num_hidden: int,
-                 num_layers: int):
+                 num_layers: int,
+                 cell_type: str):
         """
         Args:
             charmap (data.Charmap) : the character/int map
             n_mels (int) : number of input mel scales
             num_hidden (int): number of LSTM cells per layer and per direction
             num_layers (int) : number of stacked RNN layers
+            cell_type(str) either "GRU" or "LSTM"
         """
         super(CTCModel, self).__init__()
         self.batch_first = True
@@ -44,16 +46,16 @@ class CTCModel(nn.Module):
         #     *([nn.Conv1d(32, 32, 3, 1, 1), nn.ReLU()]*3),
         #     nn.Dropout(0.5),
         # )
-        self.rnn = nn.LSTM(n_mels,
-                           self.num_hidden,
-                           num_layers=num_layers,
-                           batch_first=self.batch_first,
-                           bidirectional=True)
-        # self.rnn = nn.GRU(self.n_mels,
-        #                   self.num_hidden,
-        #                   num_layers=num_layers,
-        #                   batch_first=self.batch_first,
-        #                   bidirectional=True)
+
+        if cell_type not in ["GRU", "LSTM"]:
+            raise NotImplementedError(f"Unrecognized cell type {cell_type}")
+
+        cell_builder = getattr(nn, cell_type)
+        self.rnn = cell_builder(n_mels,
+                                self.num_hidden,
+                                num_layers=num_layers,
+                                batch_first=self.batch_first,
+                                bidirectional=True)
         self.charlin = nn.Linear(2*self.num_hidden, charmap.vocab_size + 1)  # add the blank
 
     def forward(self,

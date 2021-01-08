@@ -458,7 +458,8 @@ def ex_waveform_spectro():
                                           win_length=_DEFAULT_WIN_LENGTH*1e-3,
                                           win_step=_DEFAULT_WIN_STEP*1e-3,
                                           nmels=_DEFAULT_NUM_MELS,
-                                          augment=False)
+                                          augment=False,
+                                         spectro_normalization=None)
     mel_spectro = trans_mel_spectro(waveform)
     plot_spectro(mel_spectro[0, ...], [],
                  _DEFAULT_WIN_STEP*1e-3,

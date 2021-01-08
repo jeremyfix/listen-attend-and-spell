@@ -76,9 +76,14 @@ def train(args):
     n_hidden_rnn = args.nhidden_rnn
     n_layers_rnn = args.nlayers_rnn
     blank_id = charmap.vocab_size
+    cell_type = args.cell_type
 
     num_model_args = 1
-    model = models.CTCModel(charmap, n_mels, n_hidden_rnn, n_layers_rnn)
+    model = models.CTCModel(charmap,
+                            n_mels,
+                            n_hidden_rnn,
+                            n_layers_rnn,
+                            cell_type)
     decode = model.decode
     # decode = functools.partial(model.beam_decode, beam_size=10,
     #                            blank_id=blank_id)
@@ -247,6 +252,10 @@ if __name__ == '__main__':
                         type=int,
                         help="The number of units per recurrent layer",
                         default=256)
+    parser.add_argument("--celltype",
+                        choices=["GRU", "LSTM"],
+                        default="LSTM",
+                        help="The type of reccurent memory cell")
     parser.add_argument("--weight_decay",
                         type=float,
                         help="The weight decay coefficient",
