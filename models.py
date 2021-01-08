@@ -52,7 +52,7 @@ class CTCModel(nn.Module):
             raise NotImplementedError(f"Unrecognized cell type {cell_type}")
 
         cell_builder = getattr(nn, cell_type)
-        self.rnn = cell_builder(n_mels,
+        self.rnn = cell_builder(32*n_mels,
                                 self.num_hidden,
                                 num_layers=num_layers,
                                 batch_first=self.batch_first,
@@ -71,7 +71,8 @@ class CTCModel(nn.Module):
         # out_cnn is (B, C, seq_len, num_mels)
         # make it (B, seq_len, num_features=C*num_mels)
         batch_size = unpacked_inputs.shape[0]
-        out_cnn = out_cnn.transpose(1, 2).reshape(batch_size, lens_inputs, -1)
+        seq_len = unpacked_inputs.shape[1]
+        out_cnn = out_cnn.transpose(1, 2).reshape(batch_size, seq_len, -1)
 
         # pack the cnn output, given there is no downsampling in the cnn
         # the lenghts are the same
