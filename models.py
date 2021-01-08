@@ -42,9 +42,9 @@ class CTCModel(nn.Module):
                       kernel_size=3,
                       stride=1,
                       padding=1),
-            nn.BatchNorm2d(),
+            nn.BatchNorm2d(32),
             nn.ReLU(),
-            *([nn.Conv2d(32, 32, 3, 1, 1), nn.BatchNorm2d(), nn.ReLU()]*3),
+            *([nn.Conv2d(32, 32, 3, 1, 1), nn.BatchNorm2d(32), nn.ReLU()]*3),
             nn.Dropout(0.5),
         )
 

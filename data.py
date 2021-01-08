@@ -336,25 +336,29 @@ def get_dataloaders(commonvoice_root: str,
                                                indices=indices)
 
     # Compute the normalization on the training set
-    batch_collate_norm = BatchCollate(nmels, augment=False)
-    norm_loader = torch.utils.data.DataLoader(train_dataset,
-                                              batch_size=batch_size,
-                                              shuffle=True,
-                                              num_workers=n_threads,
-                                              collate_fn=batch_collate_norm,
-                                              pin_memory=cuda)
-    mean_spectro, std_spectro = 0, 0
-    N_elem = 0
-    for spectros, _ in tqdm.tqdm(norm_loader):
-        unpacked_raveled = unpack_ravel(spectros)
-        mean_spectro += unpacked_raveled.sum().item()
-        N_elem += functools.reduce(operator.mul, unpacked_raveled.shape, 1)
-    mean_spectro /= N_elem
+    # batch_collate_norm = BatchCollate(nmels, augment=False)
+    # norm_loader = torch.utils.data.DataLoader(train_dataset,
+    #                                           batch_size=batch_size,
+    #                                           shuffle=True,
+    #                                           num_workers=n_threads,
+    #                                           collate_fn=batch_collate_norm,
+    #                                           pin_memory=cuda)
+    # mean_spectro, std_spectro = 0, 0
+    # N_elem = 0
+    # for spectros, _ in tqdm.tqdm(norm_loader):
+    #     unpacked_raveled = unpack_ravel(spectros)
+    #     mean_spectro += unpacked_raveled.sum().item()
+    #     N_elem += functools.reduce(operator.mul, unpacked_raveled.shape, 1)
+    # mean_spectro /= N_elem
 
-    for spectros, _ in tqdm.tqdm(norm_loader):
-        unpacked_raveled = unpack_ravel(spectros)
-        std_spectro += ((unpacked_raveled - mean_spectro)**2).sum()
-    std_spectro = (torch.sqrt(std_spectro/N_elem)).item()
+    # for spectros, _ in tqdm.tqdm(norm_loader):
+    #     unpacked_raveled = unpack_ravel(spectros)
+    #     std_spectro += ((unpacked_raveled - mean_spectro)**2).sum()
+    # std_spectro = (torch.sqrt(std_spectro/N_elem)).item()
+
+    # Fix for speeding up debuggin
+    mean_spectro = -31
+    std_spectro = 32
 
     normalization = (mean_spectro, std_spectro)
     if logger is not None:
