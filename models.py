@@ -55,9 +55,9 @@ class CTCModel(nn.Module):
                                 self.num_hidden,
                                 num_layers=num_layers,
                                 batch_first=self.batch_first,
-                                bidirectional=True)
+                                bidirectional=False)
         self.charlin = nn.Sequential(
-            nn.Linear(2*self.num_hidden , charmap.vocab_size + 1)  # add the blank
+            nn.Linear(self.num_hidden , charmap.vocab_size + 1)  # add the blank
             # nn.Linear(2*self.num_hidden, 128), nn.ReLU(),
             # nn.Linear(128, 128), nn.ReLU(),
             # nn.Linear(128 , charmap.vocab_size + 1)  # add the blank

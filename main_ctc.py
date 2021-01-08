@@ -91,7 +91,7 @@ def train(args):
     model.to(device)
 
     # Loss, optimizer
-    baseloss = nn.CTCLoss(blank=blank_id) 
+    baseloss = nn.CTCLoss(blank=blank_id, zero_infinity=True) 
     loss = lambda *args: baseloss(* wrap_ctc_args(*args))
     # optimizer = optim.Adam(model.parameters(), lr=args.base_lr)
     # optimizer = optim.AdamW(model.parameters(), lr=args.base_lr,
