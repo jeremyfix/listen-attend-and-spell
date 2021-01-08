@@ -37,7 +37,7 @@ class CTCModel(nn.Module):
         self.num_layers = num_layers
 
         self.cnn = nn.Sequential(
-            nn.Conv2d(in_channels=n_mels,
+            nn.Conv2d(in_channels=1,
                       out_channels=32,
                       kernel_size=3,
                       stride=1,
