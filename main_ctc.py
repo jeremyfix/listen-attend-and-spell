@@ -91,9 +91,12 @@ def train(args):
     model.to(device)
 
     # Loss, optimizer
-    baseloss = nn.CTCLoss(blank=blank_id)
+    baseloss = nn.CTCLoss(blank=blank_id) 
     loss = lambda *args: baseloss(* wrap_ctc_args(*args))
-    optimizer = optim.Adam(model.parameters(), lr=args.base_lr)
+    # optimizer = optim.Adam(model.parameters(), lr=args.base_lr)
+    # optimizer = optim.AdamW(model.parameters(), lr=args.base_lr,
+    #                        weight_decay=args.weight_decay)
+    optimizer = optim.SGD(model.parameters(), lr=args.base_lr)
 
     metrics = {
         'CTC': loss
@@ -169,7 +172,8 @@ def train(args):
         # Try to decode some of the validation samples
         model.eval()
         decoding_results = "## Decoding results on the validation set\n"
-        valid_batch = next(iter(valid_loader))
+        # valid_batch = next(iter(valid_loader))
+        valid_batch = next(iter(train_loader))
         spectro, transcripts = valid_batch
         spectro = spectro.to(device)
         # unpacked_spectro is (batch_size, seq_len, n_mels)

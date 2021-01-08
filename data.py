@@ -327,7 +327,7 @@ def get_dataloaders(commonvoice_root: str,
     valid_dataset = dataset_loader("dev")
     test_dataset = dataset_loader("test")
     if small_experiment:
-        indices = range(3*batch_size)
+        indices = range(1*batch_size)
         train_dataset = torch.utils.data.Subset(train_dataset,
                                                 indices=indices)
         valid_dataset = torch.utils.data.Subset(valid_dataset,

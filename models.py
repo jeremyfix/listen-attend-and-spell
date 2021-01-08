@@ -36,48 +36,52 @@ class CTCModel(nn.Module):
         self.num_hidden = num_hidden
         self.num_layers = num_layers
 
-        self.cnn = nn.Sequential(
-            nn.Conv2d(in_channels=1,
-                      out_channels=32,
-                      kernel_size=3,
-                      stride=1,
-                      padding=1),
-            nn.BatchNorm2d(32),
-            nn.ReLU(),
-            *([nn.Conv2d(32, 32, 3, 1, 1), nn.BatchNorm2d(32), nn.ReLU()]*3),
-            nn.Dropout(0.5),
-        )
+        # self.cnn = nn.Sequential(
+        #     nn.Conv2d(in_channels=1,
+        #               out_channels=32,
+        #               kernel_size=3,
+        #               stride=1,
+        #               padding=1),
+        #     nn.BatchNorm2d(32),
+        #     nn.ReLU(),
+        #     nn.Dropout(0.5),
+        # )
 
         if cell_type not in ["GRU", "LSTM"]:
             raise NotImplementedError(f"Unrecognized cell type {cell_type}")
 
         cell_builder = getattr(nn, cell_type)
-        self.rnn = cell_builder(32*n_mels,
+        self.rnn = cell_builder(n_mels,
                                 self.num_hidden,
                                 num_layers=num_layers,
                                 batch_first=self.batch_first,
                                 bidirectional=True)
-        self.charlin = nn.Linear(2*self.num_hidden, charmap.vocab_size + 1)  # add the blank
+        self.charlin = nn.Sequential(
+            nn.Linear(2*self.num_hidden , charmap.vocab_size + 1)  # add the blank
+            # nn.Linear(2*self.num_hidden, 128), nn.ReLU(),
+            # nn.Linear(128, 128), nn.ReLU(),
+            # nn.Linear(128 , charmap.vocab_size + 1)  # add the blank
+        )
 
     def forward(self,
                 inputs: PackedSequence) -> PackedSequence:
 
-        # # Go through the CNN
-        unpacked_inputs, lens_inputs = pad_packed_sequence(inputs,
-                                                           batch_first=True)
-        # unpacked_inputs is (batch, seq_len, num_mels)
-        # unsqueeze to make input channel_size = 1
-        out_cnn = self.cnn(unpacked_inputs.unsqueeze(dim=1))
-        # out_cnn is (B, C, seq_len, num_mels)
-        # make it (B, seq_len, num_features=C*num_mels)
-        batch_size = unpacked_inputs.shape[0]
-        seq_len = unpacked_inputs.shape[1]
-        out_cnn = out_cnn.transpose(1, 2).reshape(batch_size, seq_len, -1)
+        # # # Go through the CNN
+        # unpacked_inputs, lens_inputs = pad_packed_sequence(inputs,
+        #                                                    batch_first=True)
+        # # unpacked_inputs is (batch, seq_len, num_mels)
+        # # unsqueeze to make input channel_size = 1
+        # out_cnn = self.cnn(unpacked_inputs.unsqueeze(dim=1))
+        # # out_cnn is (B, C, seq_len, num_mels)
+        # # make it (B, seq_len, num_features=C*num_mels)
+        # batch_size = unpacked_inputs.shape[0]
+        # seq_len = unpacked_inputs.shape[1]
+        # out_cnn = out_cnn.transpose(1, 2).reshape(batch_size, seq_len, -1)
 
-        # pack the cnn output, given there is no downsampling in the cnn
-        # the lenghts are the same
-        inputs = pack_padded_sequence(out_cnn, lengths=lens_inputs,
-                                      batch_first=True)
+        # # pack the cnn output, given there is no downsampling in the cnn
+        # # the lenghts are the same
+        # inputs = pack_padded_sequence(out_cnn, lengths=lens_inputs,
+        #                               batch_first=True)
 
         # Go through the RNN
         packed_outrnn, _ = self.rnn(inputs)  # batch, seq, num_hidden
