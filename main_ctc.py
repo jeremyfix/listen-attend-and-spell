@@ -252,7 +252,7 @@ if __name__ == '__main__':
                         type=int,
                         help="The number of units per recurrent layer",
                         default=256)
-    parser.add_argument("--celltype",
+    parser.add_argument("--cell_type",
                         choices=["GRU", "LSTM"],
                         default="LSTM",
                         help="The type of reccurent memory cell")
