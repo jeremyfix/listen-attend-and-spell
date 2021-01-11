@@ -40,7 +40,7 @@ def wrap_ctc_args(packed_predictions, packed_targets):
 
     unpacked_targets, lens_targets = pad_packed_sequence(packed_targets)  # T, B
     unpacked_targets = unpacked_targets.transpose(0, 1)  # B, T
-
+    
     return unpacked_predictions, unpacked_targets, lens_predictions, lens_targets
 
 
@@ -82,15 +82,21 @@ def train(args):
                             n_hidden_rnn,
                             n_layers_rnn,
                             cell_type)
-    # decode = model.decode
-    decode = functools.partial(model.beam_decode, beam_size=10,
-                               blank_id=blank_id)
+    decode = model.decode
+    # decode = functools.partial(model.beam_decode, beam_size=10,
+    #                            blank_id=blank_id)
 
     model.to(device)
 
     # Loss, optimizer
-    baseloss = nn.CTCLoss(blank=blank_id, reduction='sum')
-    loss = lambda *args: baseloss(* wrap_ctc_args(*args))
+    baseloss = nn.CTCLoss(blank=blank_id,
+                          reduction='sum',
+                          zero_infinity=True)
+    # loss = lambda *params: baseloss(* wrap_ctc_args(*params))
+    def loss(*params):
+        with torch.backends.cudnn.flags(enabled=False):
+            return baseloss(* wrap_ctc_args(*params))
+
     optimizer = optim.Adam(model.parameters(), lr=args.base_lr)
 
     metrics = {
@@ -134,36 +140,36 @@ def train(args):
                tensorboard_writer=tensorboard_writer)
 
         # Compute and record the metrics on the validation set
-        valid_metrics = ftest(model,
-                              valid_loader,
-                              device,
-                              metrics,
-                              num_model_args=num_model_args)
-        better_model = model_checkpoint.update(valid_metrics['CTC'])
-        scheduler.step()
+        # valid_metrics = ftest(model,
+        #                       valid_loader,
+        #                       device,
+        #                       metrics,
+        #                       num_model_args=num_model_args)
+        # better_model = model_checkpoint.update(valid_metrics['CTC'])
+        # scheduler.step()
 
-        logger.info("[%d/%d] Validation:   CTCLoss : %.3f %s"% (e,
-                                                                args.num_epochs,
-                                                                valid_metrics['CTC'],
-                                                                "[>> BETTER <<]" if better_model else ""))
+        # logger.info("[%d/%d] Validation:   CTCLoss : %.3f %s"% (e,
+        #                                                         args.num_epochs,
+        #                                                         valid_metrics['CTC'],
+        #                                                         "[>> BETTER <<]" if better_model else ""))
 
-        for m_name, m_value in valid_metrics.items():
-            tensorboard_writer.add_scalar(f'metrics/valid_{m_name}',
-                                          m_value,
-                                          e+1)
-        # Compute and record the metrics on the test set
-        test_metrics = ftest(model,
-                             test_loader,
-                             device,
-                             metrics,
-                             num_model_args=num_model_args)
-        logger.info("[%d/%d] Test:   Loss : %.3f "% (e,
-                                                     args.num_epochs,
-                                                     test_metrics['CTC']))
-        for m_name, m_value in test_metrics.items():
-            tensorboard_writer.add_scalar(f'metrics/test_{m_name}',
-                                          m_value,
-                                          e+1)
+        # for m_name, m_value in valid_metrics.items():
+        #     tensorboard_writer.add_scalar(f'metrics/valid_{m_name}',
+        #                                   m_value,
+        #                                   e+1)
+        # # Compute and record the metrics on the test set
+        # test_metrics = ftest(model,
+        #                      test_loader,
+        #                      device,
+        #                      metrics,
+        #                      num_model_args=num_model_args)
+        # logger.info("[%d/%d] Test:   Loss : %.3f "% (e,
+        #                                              args.num_epochs,
+        #                                              test_metrics['CTC']))
+        # for m_name, m_value in test_metrics.items():
+        #     tensorboard_writer.add_scalar(f'metrics/test_{m_name}',
+        #                                   m_value,
+        #                                   e+1)
         # Try to decode some of the validation samples
         model.eval()
         decoding_results = "## Decoding results on the validation set\n"
@@ -179,7 +185,7 @@ def train(args):
         # unpacked_transcripts is (T, B)
         unpacked_transcripts, lens_transcripts = pad_packed_sequence(transcripts)
         # valid_batch is (T, B, n_mels)
-        for idxv in range(1):
+        for idxv in range(5):
             spectrogram = unpacked_spectro[:, idxv, :].unsqueeze(dim=1)
             spectrogram = pack_padded_sequence(spectrogram,
                                                lengths=[lens_spectro[idxv]])
@@ -225,18 +231,18 @@ if __name__ == '__main__':
     parser.add_argument("--base_lr",
                         type=float,
                         help="The base learning rate for the optimizer",
-                        default=0.01)
+                        default=0.0005)
     parser.add_argument("--grad_clip",
                         type=float,
                         help="The maxnorm of the gradient to clip to",
-                        default=None)
+                        default=400)
     parser.add_argument("--debug",
                         action="store_true",
                         help="Whether to test on a small experiment")
     parser.add_argument("--num_epochs",
                         type=int,
                         help="The number of epochs to train for",
-                        default=50)
+                        default=150)
     parser.add_argument("--train_augment",
                         action="store_true",
                         help="Whether to use or not SpecAugment during training")
@@ -251,10 +257,10 @@ if __name__ == '__main__':
     parser.add_argument("--nhidden_rnn",
                         type=int,
                         help="The number of units per recurrent layer",
-                        default=256)
+                        default=512)
     parser.add_argument("--cell_type",
                         choices=["GRU", "LSTM"],
-                        default="LSTM",
+                        default="GRU",
                         help="The type of reccurent memory cell")
     parser.add_argument("--weight_decay",
                         type=float,

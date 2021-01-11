@@ -254,7 +254,7 @@ class BatchCollate(object):
         # waveform is (1, seq_len)
         # dictionnary has the 'sentence' key for the transcript
         waveforms = [w.squeeze() for w, _, _ in batch]
-        rates = set([r for _, r, _ in batch])
+        rates = [r for _, r, _ in batch]
         transcripts = [torch.LongTensor(self.charmap.encode(d['sentence']))
                        for _, _, d in batch]
 
@@ -280,7 +280,6 @@ class BatchCollate(object):
         spectrograms = self.waveform_processor(waveforms)  # (T, B, n_mels)
         spectrograms = pack_padded_sequence(spectrograms,
                                             lengths=spectro_lengths)
-
         # transcripts is (Ty, B)
         transcripts = pad_sequence(transcripts)
         transcripts = pack_padded_sequence(transcripts,
@@ -325,14 +324,18 @@ def get_dataloaders(commonvoice_root: str,
     valid_dataset = dataset_loader("dev")
     test_dataset = dataset_loader("test")
     if small_experiment:
-        indices = [4525]
-
+        f = open('sorted_idx_train', 'r')
+        lines = f.readlines()
+        train_indices = [int(l.split(',')[0]) for l in lines[3*batch_size:4*batch_size]]
+        valid_test_indices = range(batch_size)
+        print(f"I took the train indices {train_indices}")
+        
         train_dataset = torch.utils.data.Subset(train_dataset,
-                                                indices=indices)
+                                                indices=train_indices)
         valid_dataset = torch.utils.data.Subset(valid_dataset,
-                                                indices=indices)
+                                                indices=valid_test_indices)
         test_dataset = torch.utils.data.Subset(test_dataset,
-                                               indices=indices)
+                                               indices=valid_test_indices)
 
     if normalize:
         # Compute the normalization on the training set
@@ -373,6 +376,8 @@ def get_dataloaders(commonvoice_root: str,
                                           augment=False,
                                           spectro_normalization=normalization)
 
+    print(f"Building a train loader with batch size = {batch_size}")
+    print(f"THe dataset contains {len(train_dataset)}")
     train_loader = torch.utils.data.DataLoader(train_dataset,
                                                batch_size=batch_size,
                                                shuffle=True,

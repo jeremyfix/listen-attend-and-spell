@@ -35,35 +35,36 @@ class CTCModel(nn.Module):
         self.num_hidden = num_hidden
         self.num_layers = num_layers
 
-        # self.cnn = nn.Sequential(
-        #     nn.Conv2d(in_channels=1,
-        #               out_channels=32,
-        #               kernel_size=(41,11),
-        #               stride=2,
-        #               padding=(20, 5)),
-        #     nn.BatchNorm2d(32),
-        #     nn.Hardtanh(0, 20, inplace=True),
-        #     nn.Conv2d(in_channels=32,
-        #               out_channels=32,
-        #               kernel_size=(41,11),
-        #               stride=2,
-        #               padding=(20, 5)),
-        #     nn.BatchNorm2d(32),
-        #     nn.Hardtanh(0, 20, inplace=True),
-        #     nn.Conv2d(in_channels=32,
-        #               out_channels=96,
-        #               kernel_size=(21,11),
-        #               stride=2,
-        #               padding=(10, 5)),
-        #     nn.BatchNorm2d(96),
-        #     nn.Hardtanh(0, 20, inplace=True)
-        # )
+        self.cnn = nn.Sequential(
+            nn.Conv2d(in_channels=1,
+                      out_channels=32,
+                      kernel_size=(41,11),
+                      stride=2,
+                      padding=(20, 5)),
+            nn.BatchNorm2d(32),
+            nn.Hardtanh(0, 20, inplace=True),
+            nn.Conv2d(in_channels=32,
+                      out_channels=32,
+                      kernel_size=(41,11),
+                      stride=2,
+                      padding=(20, 5)),
+            nn.BatchNorm2d(32),
+            nn.Hardtanh(0, 20, inplace=True),
+            nn.Conv2d(in_channels=32,
+                      out_channels=64,
+                      kernel_size=(21,11),
+                      stride=2,
+                      padding=(10, 5)),
+            nn.BatchNorm2d(64),
+            nn.Hardtanh(0, 20, inplace=True)
+        )
 
+        self.cell_type = cell_type
         if cell_type not in ["GRU", "LSTM"]:
             raise NotImplementedError(f"Unrecognized cell type {cell_type}")
 
         cell_builder = getattr(nn, cell_type)
-        self.rnn = cell_builder(n_mels,
+        self.rnn = cell_builder(64*n_mels//8,
                                 self.num_hidden,
                                 num_layers=num_layers,
                                 bidirectional=True)
@@ -71,36 +72,99 @@ class CTCModel(nn.Module):
             nn.Linear(2*self.num_hidden,
                       charmap.vocab_size + 1)  # add the blank
         )
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        # Let us initialize the biases with :
+        # - a high forget bias 
+        # - a zero input bias
+        # - a low output bias
+        with torch.no_grad():
+            if self.cell_type == "LSTM":
+                for i in range(self.num_layers):
+                    forw_gates = getattr(self.rnn, f'bias_ih_l{i}').chunk(4,
+                                                                     dim=0) 
+                    iig, ifg, igg, iog = forw_gates
+                    iig.fill_(0.)
+                    ifg.fill_(1.)
+                    igg.fill_(0.)
+                    iog.fill_(0.)
+
+                    forw_gates = getattr(self.rnn, f'bias_hh_l{i}').chunk(4,
+                                                                          dim=0) 
+                    hig, hfg, hgg, hog = forw_gates
+                    hig.fill_(0.)
+                    hfg.fill_(0.)
+                    hgg.fill_(0.)
+                    hog.fill_(0.)
+
+                    rev_gates = getattr(self.rnn, f'bias_ih_l{i}_reverse').chunk(4,
+                                                                            dim=0) 
+                    iig, ifg, igg, iog = rev_gates
+                    iig.fill_(0.)
+                    ifg.fill_(1.)
+                    igg.fill_(0.)
+                    iog.fill_(0.)
+
+                    rev_gates = getattr(self.rnn, f'bias_hh_l{i}_reverse').chunk(4,
+                                                                                 dim=0) 
+                    hig, hfg, hgg, hog = rev_gates
+                    hig.fill_(0.)
+                    hfg.fill_(0.)
+                    hgg.fill_(0.)
+                    hog.fill_(0.)
+            else:
+                # GRU
+                for i in range(self.num_layers):
+                    for direction in ['', '_reverse']:
+                        gates = getattr(self.rnn, f'bias_ih_l{i}{direction}').chunk(3,
+                                                                         dim=0) 
+                        irg, izg, ing = gates
+                        irg.fill_(1.)
+                        izg.fill_(-1.)
+                        ing.fill_(0.)
+
+                        gates = getattr(self.rnn, f'bias_hh_l{i}{direction}').chunk(3,
+                                                                         dim=0) 
+                        hrg, hzg, hng = gates
+                        hrg.fill_(0.)
+                        hzg.fill_(0.)
+                        hng.fill_(0.)
+
+
 
     def forward(self,
                 inputs: PackedSequence) -> PackedSequence:
 
-        # # Go through the CNN
-        # unpacked_inputs, lens_inputs = pad_packed_sequence(inputs,
-        #                                                    batch_first=True)
-        # # unpacked_inputs is (batch, seq_len, num_mels)
-        # # unsqueeze to make input channel_size = 1
-        # out_cnn = self.cnn(unpacked_inputs.unsqueeze(dim=1))
+        # Go through the CNN
+        unpacked_inputs, lens_inputs = pad_packed_sequence(inputs)
 
-        # # out_cnn is (B, C, seq_len, num_mels)
-        # # make it (B, seq_len, num_features=C*num_mels)
-        # batch_size = out_cnn.shape[0]
-        # seq_len = out_cnn.shape[2]
-        # out_cnn = out_cnn.transpose(1, 2).reshape(batch_size, seq_len, -1)
+        # unpacked_inputs is (seq_len, batch_size, num_mels)
+        # make it (batch_size, seq_len, num_mels) and
+        # unsqueeze to make input channel_size = 1 to make it
+        # (batch_size, 1, seq_len, num_mels)
+        unpacked_inputs = unpacked_inputs.transpose(0, 1).unsqueeze(dim=1)
+        out_cnn = self.cnn(unpacked_inputs)
 
-        # # pack the cnn output, given there is no downsampling in the cnn
-        # # the lenghts are the same
-        # inputs = pack_padded_sequence(out_cnn,
-        #                               lengths=lens_inputs//8,
-        #                               batch_first=True)
+        # out_cnn is (B, C, seq_len, num_mels)
+        # make it (seq_len, B, num_features=C*num_mels)
+        batch_size = out_cnn.shape[0]
+        seq_len = out_cnn.shape[2]
+        out_cnn = out_cnn.permute(2, 0, 1, 3).reshape(seq_len, batch_size, -1)
+
+        # pack the cnn output, given there is no downsampling in the cnn
+        # the lenghts are the same
+        inputs = pack_padded_sequence(out_cnn,
+                                      lengths=lens_inputs//8)
 
         # Go through the RNN
-        packed_outrnn, _ = self.rnn(inputs)  # batch, seq, num_hidden
+        packed_outrnn, _ = self.rnn(inputs)  # seq, batch, num_hidden
 
         unpacked_outrnn, lens_outrnn = pad_packed_sequence(packed_outrnn)
 
         # Go through the next char predictor
         out_lin = self.charlin(unpacked_outrnn)
+        # print(out_lin)
 
         # Repack the result
         outputs = pack_padded_sequence(out_lin,
