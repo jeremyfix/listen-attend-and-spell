@@ -91,12 +91,9 @@ def train(args):
     model.to(device)
 
     # Loss, optimizer
-    baseloss = nn.CTCLoss(blank=blank_id, zero_infinity=True) 
+    baseloss = nn.CTCLoss(blank=blank_id) 
     loss = lambda *args: baseloss(* wrap_ctc_args(*args))
-    # optimizer = optim.Adam(model.parameters(), lr=args.base_lr)
-    # optimizer = optim.AdamW(model.parameters(), lr=args.base_lr,
-    #                        weight_decay=args.weight_decay)
-    optimizer = optim.SGD(model.parameters(), lr=args.base_lr)
+    optimizer = optim.Adam(model.parameters(), lr=args.base_lr)
 
     metrics = {
         'CTC': loss
@@ -183,7 +180,7 @@ def train(args):
         unpacked_transcripts, lens_transcripts = pad_packed_sequence(transcripts,
                                                                      batch_first=True)
         # valid_batch is (batch, seq_len, n_mels)
-        for idxv in range(5):
+        for idxv in range(1):
             spectrogram = unpacked_spectro[idxv, :, :].unsqueeze(dim=0)
             spectrogram = pack_padded_sequence(spectrogram, batch_first=True,
                                                lengths=[lens_spectro[idxv]])
