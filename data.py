@@ -27,8 +27,7 @@ _DEFAULT_NUM_MELS = 80
 
 
 def unpack_ravel(tensor: PackedSequence):
-    unpacked_tensor, lens_tensor = pad_packed_sequence(tensor, 
-                                                       batch_first=True)
+    unpacked_tensor, lens_tensor = pad_packed_sequence(tensor)  # T, B, *
     raveled = torch.cat([
         tensori[:leni] for tensori, leni in zip(unpacked_tensor,
                                                 lens_tensor)
@@ -86,16 +85,16 @@ class CharMap(object):
         }
 
         self.equivalent_char = {}
-        # for i in range(224, 229):
-        #     self.equivalent_char[chr(i)] = 'a'
-        # for i in range(232, 236):
-        #     self.equivalent_char[chr(i)] = 'e'
-        # for i in range(236, 240):
-        #     self.equivalent_char[chr(i)] = 'i'
-        # for i in range(242, 247):
-        #     self.equivalent_char[chr(i)] = 'o'
-        # for i in range(249, 253):
-        #     self.equivalent_char[chr(i)] = 'u'
+        for i in range(224, 229):
+            self.equivalent_char[chr(i)] = 'a'
+        for i in range(232, 236):
+            self.equivalent_char[chr(i)] = 'e'
+        for i in range(236, 240):
+            self.equivalent_char[chr(i)] = 'i'
+        for i in range(242, 247):
+            self.equivalent_char[chr(i)] = 'o'
+        for i in range(249, 253):
+            self.equivalent_char[chr(i)] = 'u'
         # Remove the punctuation marks
         for c in ['!', '?', ';']:
             self.equivalent_char[c] = '.'
@@ -195,12 +194,12 @@ class WaveformProcessor(object):
         to the MelSpectrogram object.
 
         Args:
-            waveforms(torch.Tensor) : (B, Tx) waveform
+            waveforms(torch.Tensor) : (Tx, B) waveform
         Returns:
-            spectrograms(torch.Tensor): (B, Tx//nstep + 1, n_mels)
+            spectrograms(torch.Tensor): (Tx//nstep + 1, B, n_mels)
         """
         # Compute the spectorgram
-        spectro = self.transform_tospectro(waveforms)
+        spectro = self.transform_tospectro(waveforms.transpose(0, 1))  # (B, n_mels, T)
 
         # Normalize the spectrogram
         if self.spectro_normalization is not None:
@@ -211,8 +210,8 @@ class WaveformProcessor(object):
             spectro = self.transform_augment(spectro)
 
         # spectrograms is (B, n_mel, T)
-        # we permute it to be (B, T, n_mel)
-        return spectro.permute(0, 2, 1)
+        # we permute it to be (T, B, n_mel)
+        return spectro.permute(2, 0, 1)
 
 
 class BatchCollate(object):
@@ -251,7 +250,10 @@ class BatchCollate(object):
                 targets : (Batch size, time)
         """
         # Extract the subcomponents
-        waveforms = [w for w, _, _ in batch]
+        # The CommonVoice dataset returns (waveform, sample_rate, dictionnary)
+        # waveform is (1, seq_len)
+        # dictionnary has the 'sentence' key for the transcript
+        waveforms = [w.squeeze() for w, _, _ in batch]
         rates = set([r for _, r, _ in batch])
         transcripts = [torch.LongTensor(self.charmap.encode(d['sentence']))
                        for _, _, d in batch]
@@ -262,34 +264,30 @@ class BatchCollate(object):
 
         # Sort the waveforms and transcripts by decreasing waveforms length
         wt_sorted = sorted(zip(waveforms, transcripts),
-                           key=lambda wr: wr[0].shape[1],
+                           key=lambda wr: wr[0].shape[0],
                            reverse=True)
         waveforms = [wt[0] for wt in wt_sorted]
         transcripts = [wt[1] for wt in wt_sorted]
 
-        # Compute the lenghts of the spectrograms from the lengths
+        # Compute the lengths of the spectrograms from the lengths
         # of the waveforms
-        waveforms_lengths = [w.shape[1] for w in waveforms]
+        waveforms_lengths = [w.shape[0] for w in waveforms]
         spectro_lengths = [self.waveform_processor.get_spectro_length(wl) for wl in waveforms_lengths]
         transcripts_lengths = [t.shape[0] for t in transcripts]
 
         # Pad the waveforms to the longest waveform
         # so that we can process them as a batch through the transform
-        waveforms = pad_sequence([t.squeeze() for t in waveforms],
-                                 batch_first=True)  # (batch, time)
+        waveforms = pad_sequence(waveforms)  # (T, B)
 
-        spectrograms = self.waveform_processor(waveforms)  # (batch, time, n_mels)
+        spectrograms = self.waveform_processor(waveforms)  # (T, B, n_mels)
         spectrograms = pack_padded_sequence(spectrograms,
-                                            lengths=spectro_lengths,
-                                            batch_first=True)
+                                            lengths=spectro_lengths)
 
-        # transcripts is (B, Ty)
-        transcripts = pad_sequence(transcripts,
-                                   batch_first=True)
+        # transcripts is (Ty, B)
+        transcripts = pad_sequence(transcripts)
         transcripts = pack_padded_sequence(transcripts,
                                            lengths=transcripts_lengths,
-                                           enforce_sorted=False,
-                                           batch_first=True)
+                                           enforce_sorted=False)
 
         return spectrograms, transcripts
 
@@ -302,7 +300,8 @@ def get_dataloaders(commonvoice_root: str,
                     small_experiment:bool = False,
                     train_augment:bool = False,
                     nmels: int = _DEFAULT_NUM_MELS,
-                    logger = None):
+                    logger = None,
+                    normalize=True):
     """
     Build and return the pytorch dataloaders
 
@@ -318,6 +317,7 @@ def get_dataloaders(commonvoice_root: str,
         train_augment (bool) : whether to use SpecAugment
         nmels (int) : the number of mel scales to consider
         logger : an optional logging logger
+        normalize : wheter or not to center reduce the spectrograms
     """
 
     dataset_loader = functools.partial(load_dataset,
@@ -327,7 +327,7 @@ def get_dataloaders(commonvoice_root: str,
     valid_dataset = dataset_loader("dev")
     test_dataset = dataset_loader("test")
     if small_experiment:
-        indices = range(1*batch_size)
+        indices = range(batch_size)
         train_dataset = torch.utils.data.Subset(train_dataset,
                                                 indices=indices)
         valid_dataset = torch.utils.data.Subset(valid_dataset,
@@ -335,32 +335,35 @@ def get_dataloaders(commonvoice_root: str,
         test_dataset = torch.utils.data.Subset(test_dataset,
                                                indices=indices)
 
-    # Compute the normalization on the training set
-    # batch_collate_norm = BatchCollate(nmels, augment=False)
-    # norm_loader = torch.utils.data.DataLoader(train_dataset,
-    #                                           batch_size=batch_size,
-    #                                           shuffle=True,
-    #                                           num_workers=n_threads,
-    #                                           collate_fn=batch_collate_norm,
-    #                                           pin_memory=cuda)
-    # mean_spectro, std_spectro = 0, 0
-    # N_elem = 0
-    # for spectros, _ in tqdm.tqdm(norm_loader):
-    #     unpacked_raveled = unpack_ravel(spectros)
-    #     mean_spectro += unpacked_raveled.sum().item()
-    #     N_elem += functools.reduce(operator.mul, unpacked_raveled.shape, 1)
-    # mean_spectro /= N_elem
+    if normalize:
+        # Compute the normalization on the training set
+        # batch_collate_norm = BatchCollate(nmels, augment=False)
+        # norm_loader = torch.utils.data.DataLoader(train_dataset,
+        #                                           batch_size=batch_size,
+        #                                           shuffle=True,
+        #                                           num_workers=n_threads,
+        #                                           collate_fn=batch_collate_norm,
+        #                                           pin_memory=cuda)
+        # mean_spectro, std_spectro = 0, 0
+        # N_elem = 0
+        # for spectros, _ in tqdm.tqdm(norm_loader):
+        #     unpacked_raveled = unpack_ravel(spectros)
+        #     mean_spectro += unpacked_raveled.sum().item()
+        #     N_elem += functools.reduce(operator.mul, unpacked_raveled.shape, 1)
+        # mean_spectro /= N_elem
 
-    # for spectros, _ in tqdm.tqdm(norm_loader):
-    #     unpacked_raveled = unpack_ravel(spectros)
-    #     std_spectro += ((unpacked_raveled - mean_spectro)**2).sum()
-    # std_spectro = (torch.sqrt(std_spectro/N_elem)).item()
+        # for spectros, _ in tqdm.tqdm(norm_loader):
+        #     unpacked_raveled = unpack_ravel(spectros)
+        #     std_spectro += ((unpacked_raveled - mean_spectro)**2).sum()
+        # std_spectro = (torch.sqrt(std_spectro/N_elem)).item()
 
-    # Fix for speeding up debuggin
-    mean_spectro = -31
-    std_spectro = 32
+        # Fix for speeding up debuggin
+        mean_spectro = -31
+        std_spectro = 32
+        normalization = (mean_spectro, std_spectro)
+    else:
+        normalization = None
 
-    normalization = (mean_spectro, std_spectro)
     if logger is not None:
         logger.info(f"Normalization coefficients : {mean_spectro}, {std_spectro}")
 
@@ -399,7 +402,7 @@ def plot_spectro(spectrogram: torch.Tensor,
                  charmap: CharMap) -> None:
     '''
     Args:
-        spectrogram (seq_len, n_mels) tensor
+        spectrogram (time, n_mels) tensor
         trancript (target_len, ) LongTensor
         win_step is the stride of the windows, in seconds, for computing the
                  spectrogram
@@ -446,26 +449,26 @@ def ex_waveform_spectro():
     waveform, rate, dictionary = dataset[idx]
     n_begin = rate  # 1 s.
     n_end = 3*rate  # 2 s.
-    waveform = waveform[:, n_begin:n_end]
+    waveform = waveform[:, n_begin:n_end]  # B, T
 
     nfft = int(_DEFAULT_WIN_LENGTH * 1e-3 * _DEFAULT_RATE)
-    nmels = _DEFAULT_NUM_MELS
+    # nmels = _DEFAULT_NUM_MELS
     nstep = int(_DEFAULT_WIN_STEP * 1e-3 * _DEFAULT_RATE)
     trans_spectro = nn.Sequential(
         Spectrogram(n_fft=nfft,
-                       hop_length=nstep),
+                    hop_length=nstep),
         AmplitudeToDB()
     )
-    spectro = trans_spectro(waveform)  # batch, seq_len, nfs
+    spectro = trans_spectro(waveform)  # B, n_mels, T
 
     trans_mel_spectro = WaveformProcessor(rate=rate,
                                           win_length=_DEFAULT_WIN_LENGTH*1e-3,
                                           win_step=_DEFAULT_WIN_STEP*1e-3,
                                           nmels=_DEFAULT_NUM_MELS,
                                           augment=False,
-                                         spectro_normalization=None)
-    mel_spectro = trans_mel_spectro(waveform)
-    plot_spectro(mel_spectro[0, ...], [],
+                                          spectro_normalization=None)
+    mel_spectro = trans_mel_spectro(waveform.transpose(0, 1))  # T, B, n_mels
+    plot_spectro(mel_spectro[:, 0, :], [],
                  _DEFAULT_WIN_STEP*1e-3,
                  CharMap())
 
@@ -490,7 +493,7 @@ def ex_waveform_spectro():
     fig.colorbar(im, ax=ax)
 
     ax = axes[2]
-    im = ax.imshow(mel_spectro[0].T,
+    im = ax.imshow(mel_spectro[:, 0, :].T,
                    extent=[n_begin/rate, n_end/rate,
                            0, mel_spectro.shape[0]],
                    aspect='auto',
@@ -511,73 +514,85 @@ def ex_spectro():
 
     # Data loading
     batch_size = 4
-    train_loader, valid_loader, test_loader = get_dataloaders(_DEFAULT_COMMONVOICE_ROOT,
-                                                              _DEFAULT_COMMONVOICE_VERSION,
-                                                              cuda=False,
-                                                              n_threads=4,
-                                                              batch_size=batch_size,
-                                                              train_augment=True)
+    loaders = get_dataloaders(_DEFAULT_COMMONVOICE_ROOT,
+                              _DEFAULT_COMMONVOICE_VERSION,
+                              cuda=False,
+                              n_threads=4,
+                              batch_size=batch_size,
+                              train_augment=True,
+                              normalize=False)
+    train_loader, valid_loader, test_loader = loaders
+
     X, y = next(iter(train_loader))
-    # X is (batch_size, Tx, n_mels)
-    X, lens_X = pad_packed_sequence(X, batch_first=True)
-    # Y is (batch_size, Ty)
-    y, lens_y = pad_packed_sequence(y, batch_first=True)
+    # X is (Tx, batch_size, n_mels)
+    X, lens_X = pad_packed_sequence(X)
+    # Y is (Ty, batch_size)
+    y, lens_y = pad_packed_sequence(y)
 
     print("Some decoder texts from the LongTensors")
-    for yi, li in zip(y, lens_y):
-        print(charmap.decode(yi)[:li])
+    for iy, li in enumerate(lens_y):
+        print(charmap.decode(y[:li, iy]))
 
     fig, axes = plt.subplots(nrows=batch_size,
                              ncols=1, sharex=True,
                              figsize=(10, 7)
                             )
-    for iax, (ax, spectroi) in enumerate(zip(axes, X)):
-        # spectroi is of shape (n_steps, n_mels)
+    for iax, ax in enumerate(axes):
+        # spectroi is of shape (Tx, n_mels)
+        print(X.shape)
+        spectroi = X[:, iax, :]
         im = ax.imshow(spectroi.T,
-                       extent=[0, spectroi.shape[1]*_DEFAULT_WIN_STEP*1e-3,
-                               0, spectroi.shape[0]],
+                       extent=[0, spectroi.shape[0]*_DEFAULT_WIN_STEP*1e-3,
+                               0, spectroi.shape[1]],
                        aspect='auto',
                        cmap='magma',
-                       origin='lower',
-                       vmin=-100, vmax=10)
+                       origin='lower')
+                       # vmin=-100, vmax=10)
         ax.set_ylabel('Mel scale')
-        ax.set_title('{}'.format(charmap.decode(y[iax][:lens_y[iax]])))
+        ax.set_title('{}'.format(charmap.decode(y[:lens_y[iax], iax])))
     fig.colorbar(im, ax=axes.ravel().tolist())
     plt.xlabel('Time (s.)')
     plt.savefig('spectro.png')
+    plt.show()
 
 def ex_augmented_spectro():
     charmap = CharMap()
 
     # Data loading
     batch_size = 4
-    train_loader, valid_loader, test_loader = get_dataloaders(_DEFAULT_COMMONVOICE_ROOT,
-                                                              _DEFAULT_COMMONVOICE_VERSION,
-                                                              cuda=False,
-                                                              n_threads=4,
-                                                              batch_size=batch_size,
-                                                              train_augment=True)
+    loaders = get_dataloaders(_DEFAULT_COMMONVOICE_ROOT,
+                              _DEFAULT_COMMONVOICE_VERSION,
+                              cuda=False,
+                              n_threads=4,
+                              batch_size=batch_size,
+                              train_augment=True,
+                              normalize=False)
+    train_loader, valid_loader, test_loader = loaders
+
     # From the validation set
     X, y = next(iter(valid_loader))
-    # X is (batch_size, Tx, n_mels)
-    X, lens_X = pad_packed_sequence(X, batch_first=True)
-    # Y is (batch_size, Ty)
-    y, lens_y = pad_packed_sequence(y, batch_first=True)
+
+    # X is (T, B, n_mels)
+    X, lens_X = pad_packed_sequence(X)
+
+    # Y is (T, B)
+    y, lens_y = pad_packed_sequence(y)
     idx = 1
-    plot_spectro(X[idx, ...], y[idx, :lens_y[idx]],
+    plot_spectro(X[:, idx, :], y[:lens_y[idx], idx],
                  _DEFAULT_WIN_STEP*1e-3,
                  charmap)
     plt.savefig('spectro_valid.png')
 
     # From the validation set
     X, y = next(iter(train_loader))
-    # X is (batch_size, Tx, n_mels)
-    X, lens_X = pad_packed_sequence(X, batch_first=True)
-    # Y is (batch_size, Ty)
-    y, lens_y = pad_packed_sequence(y, batch_first=True)
+
+    # X is (T, B, n_mels)
+    X, lens_X = pad_packed_sequence(X)
+    # Y is (T, B)
+    y, lens_y = pad_packed_sequence(y)
     idx = 0
     print(X.shape, _DEFAULT_WIN_STEP*1e-3)
-    plot_spectro(X[idx, ...], y[idx, :lens_y[idx]],
+    plot_spectro(X[:, idx, :], y[:lens_y[idx], idx],
                  _DEFAULT_WIN_STEP*1e-3,
                  charmap)
     plt.savefig('spectro_train.png')
@@ -587,6 +602,6 @@ def ex_augmented_spectro():
 
 if __name__ == '__main__':
     # ex_charmap()
-    ex_waveform_spectro()
+    # ex_waveform_spectro()
     # ex_spectro()
-    # ex_augmented_spectro()
+    ex_augmented_spectro()

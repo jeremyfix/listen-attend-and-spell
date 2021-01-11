@@ -30,7 +30,6 @@ class CTCModel(nn.Module):
             cell_type(str) either "GRU" or "LSTM"
         """
         super(CTCModel, self).__init__()
-        self.batch_first = True
         self.charmap = charmap
         self.n_mels = n_mels
         self.num_hidden = num_hidden
@@ -67,7 +66,6 @@ class CTCModel(nn.Module):
         self.rnn = cell_builder(n_mels,
                                 self.num_hidden,
                                 num_layers=num_layers,
-                                batch_first=self.batch_first,
                                 bidirectional=True)
         self.charlin = nn.Sequential(
             nn.Linear(2*self.num_hidden,
@@ -99,16 +97,14 @@ class CTCModel(nn.Module):
         # Go through the RNN
         packed_outrnn, _ = self.rnn(inputs)  # batch, seq, num_hidden
 
-        unpacked_outrnn, lens_outrnn = pad_packed_sequence(packed_outrnn,
-                                                           batch_first=True)
+        unpacked_outrnn, lens_outrnn = pad_packed_sequence(packed_outrnn)
 
         # Go through the next char predictor
         out_lin = self.charlin(unpacked_outrnn)
 
         # Repack the result
         outputs = pack_padded_sequence(out_lin,
-                                       lengths=lens_outrnn,
-                                       batch_first=True)
+                                       lengths=lens_outrnn)
         return outputs
 
     def decode(self,
@@ -124,14 +120,14 @@ class CTCModel(nn.Module):
                           with the corresponding sequence
         """
         with torch.no_grad():
-            outputs = self.forward(inputs)  # packed batch, seq, num_char
-            unpacked_outputs, lens_outputs = pad_packed_sequence(outputs,
-                                                                 batch_first=True)
-            batch_size, seq_len, num_char = unpacked_outputs.shape
+            outputs = self.forward(inputs)  # packed  T, B, num_char
+            unpacked_outputs, lens_outputs = pad_packed_sequence(outputs)
+            seq_len, batch_size, num_char = unpacked_outputs.shape
+
             if batch_size != 1:
                 raise NotImplementedError("Can decode only one batch at a time")
 
-            unpacked_outputs = unpacked_outputs.squeeze(dim=0)  # seq, vocab_size
+            unpacked_outputs = unpacked_outputs.squeeze(dim=1)  # seq, vocab_size
             outputs = unpacked_outputs.log_softmax(dim=1)
             top_values, top_indices = outputs.topk(k=1, dim=1)
 
@@ -183,14 +179,13 @@ class CTCModel(nn.Module):
             return a_max + lsp
 
         with torch.no_grad():
-            outputs = self.forward(inputs)  # packed batch, seq, num_char
-            unpacked_outputs, lens_outputs = pad_packed_sequence(outputs,
-                                                                 batch_first=True)
-            batch_size, T, S = unpacked_outputs.shape
+            outputs = self.forward(inputs)  # packed T, B, num_char
+            unpacked_outputs, lens_outputs = pad_packed_sequence(outputs)
+            T, batch_size, S = unpacked_outputs.shape
             if batch_size != 1:
                 raise NotImplementedError("Can decode only one batch at a time")
 
-            unpacked_outputs = unpacked_outputs.squeeze(dim=0)  # seq, vocab_size
+            unpacked_outputs = unpacked_outputs.squeeze(dim=1)  # seq, vocab_size
             probs = unpacked_outputs.log_softmax(dim=1)
 
             # Elements in the beam are (prefix, (p_blank, p_no_blank))

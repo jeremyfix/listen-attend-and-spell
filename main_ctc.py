@@ -33,15 +33,13 @@ def wrap_ctc_args(packed_predictions, packed_targets):
     Returns:
         log_softmax predictions, targets, lens_predictions, lens_targets
     """
-    unpacked_predictions, lens_predictions = pad_packed_sequence(packed_predictions,
-                                                                 batch_first=True)
-    # compute the log_softmax
-    unpacked_predictions = unpacked_predictions.log_softmax(dim=2)
-    # make it (T, batch, vocab_size)
-    unpacked_predictions = unpacked_predictions.transpose(0, 1)
+    unpacked_predictions, lens_predictions = pad_packed_sequence(packed_predictions)  # T, B, vocab_size
 
-    unpacked_targets, lens_targets = pad_packed_sequence(packed_targets,
-                                                        batch_first=True)
+    # compute the log_softmax
+    unpacked_predictions = unpacked_predictions.log_softmax(dim=2)  # T, B, vocab_size
+
+    unpacked_targets, lens_targets = pad_packed_sequence(packed_targets)  # T, B
+    unpacked_targets = unpacked_targets.transpose(0, 1)  # B, T
 
     return unpacked_predictions, unpacked_targets, lens_predictions, lens_targets
 
@@ -91,7 +89,7 @@ def train(args):
     model.to(device)
 
     # Loss, optimizer
-    baseloss = nn.CTCLoss(blank=blank_id) 
+    baseloss = nn.CTCLoss(blank=blank_id)
     loss = lambda *args: baseloss(* wrap_ctc_args(*args))
     optimizer = optim.Adam(model.parameters(), lr=args.base_lr)
 
@@ -169,24 +167,25 @@ def train(args):
         # Try to decode some of the validation samples
         model.eval()
         decoding_results = "## Decoding results on the validation set\n"
+
         # valid_batch = next(iter(valid_loader))
         valid_batch = next(iter(train_loader))
         spectro, transcripts = valid_batch
         spectro = spectro.to(device)
-        # unpacked_spectro is (batch_size, seq_len, n_mels)
-        unpacked_spectro, lens_spectro = pad_packed_sequence(spectro,
-                                                             batch_first=True)
-        # unpacked_transcripts is (batch_size, seq_len)
-        unpacked_transcripts, lens_transcripts = pad_packed_sequence(transcripts,
-                                                                     batch_first=True)
-        # valid_batch is (batch, seq_len, n_mels)
+
+        # unpacked_spectro is (T, B, n_mels)
+        unpacked_spectro, lens_spectro = pad_packed_sequence(spectro)
+
+        # unpacked_transcripts is (T, B)
+        unpacked_transcripts, lens_transcripts = pad_packed_sequence(transcripts)
+        # valid_batch is (T, B, n_mels)
         for idxv in range(1):
-            spectrogram = unpacked_spectro[idxv, :, :].unsqueeze(dim=0)
-            spectrogram = pack_padded_sequence(spectrogram, batch_first=True,
+            spectrogram = unpacked_spectro[:, idxv, :].unsqueeze(dim=0)
+            spectrogram = pack_padded_sequence(spectrogram,
                                                lengths=[lens_spectro[idxv]])
             likely_sequences = decode(spectrogram)
 
-            decoding_results += "\nGround truth : " + charmap.decode(unpacked_transcripts[idxv]) + '\n'
+            decoding_results += "\nGround truth : " + charmap.decode(unpacked_transcripts[:, idxv]) + '\n'
             decoding_results += "Log prob     Sequence\n"
             decoding_results += "\n".join(["{:.2f}        {}".format(p, s) for (p, s) in likely_sequences])
             decoding_results += '\n'
