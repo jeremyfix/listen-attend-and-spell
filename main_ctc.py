@@ -180,7 +180,7 @@ def train(args):
         unpacked_transcripts, lens_transcripts = pad_packed_sequence(transcripts)
         # valid_batch is (T, B, n_mels)
         for idxv in range(1):
-            spectrogram = unpacked_spectro[:, idxv, :].unsqueeze(dim=0)
+            spectrogram = unpacked_spectro[:, idxv, :].unsqueeze(dim=1)
             spectrogram = pack_padded_sequence(spectrogram,
                                                lengths=[lens_spectro[idxv]])
             likely_sequences = decode(spectrogram)
