@@ -82,14 +82,14 @@ def train(args):
                             n_hidden_rnn,
                             n_layers_rnn,
                             cell_type)
-    decode = model.decode
-    # decode = functools.partial(model.beam_decode, beam_size=10,
-    #                            blank_id=blank_id)
+    # decode = model.decode
+    decode = functools.partial(model.beam_decode, beam_size=10,
+                               blank_id=blank_id)
 
     model.to(device)
 
     # Loss, optimizer
-    baseloss = nn.CTCLoss(blank=blank_id)
+    baseloss = nn.CTCLoss(blank=blank_id, reduction='sum')
     loss = lambda *args: baseloss(* wrap_ctc_args(*args))
     optimizer = optim.Adam(model.parameters(), lr=args.base_lr)
 

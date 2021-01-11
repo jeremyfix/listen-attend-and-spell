@@ -258,9 +258,8 @@ class BatchCollate(object):
         transcripts = [torch.LongTensor(self.charmap.encode(d['sentence']))
                        for _, _, d in batch]
 
-        if len(rates) != 1:
-            # We resample the signal to the _DEFAULT_RATE
-            waveforms = [torchaudio.transforms.Resample(r, _DEFAULT_RATE)(w) if r != _DEFAULT_RATE else w for w, r in zip(waveforms, rates)]
+        # We resample the signal to the _DEFAULT_RATE
+        waveforms = [torchaudio.transforms.Resample(r, _DEFAULT_RATE)(w) if r != _DEFAULT_RATE else w for w, r in zip(waveforms, rates)]
 
         # Sort the waveforms and transcripts by decreasing waveforms length
         wt_sorted = sorted(zip(waveforms, transcripts),
@@ -278,7 +277,6 @@ class BatchCollate(object):
         # Pad the waveforms to the longest waveform
         # so that we can process them as a batch through the transform
         waveforms = pad_sequence(waveforms)  # (T, B)
-
         spectrograms = self.waveform_processor(waveforms)  # (T, B, n_mels)
         spectrograms = pack_padded_sequence(spectrograms,
                                             lengths=spectro_lengths)
@@ -327,7 +325,8 @@ def get_dataloaders(commonvoice_root: str,
     valid_dataset = dataset_loader("dev")
     test_dataset = dataset_loader("test")
     if small_experiment:
-        indices = range(batch_size)
+        indices = [4525]
+
         train_dataset = torch.utils.data.Subset(train_dataset,
                                                 indices=indices)
         valid_dataset = torch.utils.data.Subset(valid_dataset,
@@ -438,6 +437,8 @@ def ex_charmap():
     print('œ' in charmap.char2idx)
 
     print(f"The vocabulary contains {charmap.vocab_size} characters")
+
+    print(charmap.decode([16, 20,  3, 22, 36, 37,  1, 29, 32, 26, 31,  5,  2]))
 
 def ex_waveform_spectro():
     dataset = load_dataset("train",
@@ -599,9 +600,25 @@ def ex_augmented_spectro():
 
     plt.show()
 
+def order_by_length():
+    dataset_loader = functools.partial(load_dataset,
+                                       commonvoice_root=_DEFAULT_COMMONVOICE_ROOT,
+                                       commonvoice_version=_DEFAULT_COMMONVOICE_VERSION)
+       
+    def forder(ds):    
+        idx_lens = [(w.shape[1], itrain) for itrain, (w, _, _) in enumerate(ds)]
+        return sorted(idx_lens, key=lambda wi: wi[0])
+    for k in ["dev", "test", "train"]:
+        print(f"Ordering {k}")
+        sorted_idx = forder(dataset_loader(k))
+        with open(f"sorted_idx_{k}", "w") as f:
+            f.write("\n".join(f"{idxi},{leni}" for leni, idxi in sorted_idx))
+                
+
 
 if __name__ == '__main__':
-    # ex_charmap()
+    # order_by_length()
+    ex_charmap()
     # ex_waveform_spectro()
     # ex_spectro()
-    ex_augmented_spectro()
+    # ex_augmented_spectro()
