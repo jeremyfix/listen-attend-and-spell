@@ -40,6 +40,8 @@ def wrap_ctc_args(packed_predictions, packed_targets):
 
     unpacked_targets, lens_targets = pad_packed_sequence(packed_targets)  # T, B
     unpacked_targets = unpacked_targets.transpose(0, 1)  # B, T
+    # Stack the subslices of the tensors
+    unpacked_targets = torch.cat([batchi[:ti] for batchi, ti in zip(unpacked_targets, lens_targets)])
     
     return unpacked_predictions, unpacked_targets, lens_predictions, lens_targets
 
@@ -73,7 +75,7 @@ def train(args):
     n_mels = args.nmels
     n_hidden_rnn = args.nhidden_rnn
     n_layers_rnn = args.nlayers_rnn
-    blank_id = charmap.vocab_size
+    blank_id = charmap.blankid
     cell_type = args.cell_type
 
     num_model_args = 1
@@ -90,7 +92,7 @@ def train(args):
 
     # Loss, optimizer
     baseloss = nn.CTCLoss(blank=blank_id,
-                          reduction='sum',
+                          reduction='mean',
                           zero_infinity=True)
     # loss = lambda *params: baseloss(* wrap_ctc_args(*params))
     def loss(*params):
@@ -140,42 +142,41 @@ def train(args):
                tensorboard_writer=tensorboard_writer)
 
         # Compute and record the metrics on the validation set
-        # valid_metrics = ftest(model,
-        #                       valid_loader,
-        #                       device,
-        #                       metrics,
-        #                       num_model_args=num_model_args)
-        # better_model = model_checkpoint.update(valid_metrics['CTC'])
-        # scheduler.step()
+        valid_metrics = ftest(model,
+                              valid_loader,
+                              device,
+                              metrics,
+                              num_model_args=num_model_args)
+        better_model = model_checkpoint.update(valid_metrics['CTC'])
+        scheduler.step()
 
-        # logger.info("[%d/%d] Validation:   CTCLoss : %.3f %s"% (e,
-        #                                                         args.num_epochs,
-        #                                                         valid_metrics['CTC'],
-        #                                                         "[>> BETTER <<]" if better_model else ""))
+        logger.info("[%d/%d] Validation:   CTCLoss : %.3f %s"% (e,
+                                                                args.num_epochs,
+                                                                valid_metrics['CTC'],
+                                                                "[>> BETTER <<]" if better_model else ""))
 
-        # for m_name, m_value in valid_metrics.items():
-        #     tensorboard_writer.add_scalar(f'metrics/valid_{m_name}',
-        #                                   m_value,
-        #                                   e+1)
-        # # Compute and record the metrics on the test set
-        # test_metrics = ftest(model,
-        #                      test_loader,
-        #                      device,
-        #                      metrics,
-        #                      num_model_args=num_model_args)
-        # logger.info("[%d/%d] Test:   Loss : %.3f "% (e,
-        #                                              args.num_epochs,
-        #                                              test_metrics['CTC']))
-        # for m_name, m_value in test_metrics.items():
-        #     tensorboard_writer.add_scalar(f'metrics/test_{m_name}',
-        #                                   m_value,
-        #                                   e+1)
+        for m_name, m_value in valid_metrics.items():
+            tensorboard_writer.add_scalar(f'metrics/valid_{m_name}',
+                                          m_value,
+                                          e+1)
+        # Compute and record the metrics on the test set
+        test_metrics = ftest(model,
+                             test_loader,
+                             device,
+                             metrics,
+                             num_model_args=num_model_args)
+        logger.info("[%d/%d] Test:   Loss : %.3f "% (e,
+                                                     args.num_epochs,
+                                                     test_metrics['CTC']))
+        for m_name, m_value in test_metrics.items():
+            tensorboard_writer.add_scalar(f'metrics/test_{m_name}',
+                                          m_value,
+                                          e+1)
         # Try to decode some of the validation samples
         model.eval()
         decoding_results = "## Decoding results on the validation set\n"
 
-        # valid_batch = next(iter(valid_loader))
-        valid_batch = next(iter(train_loader))
+        valid_batch = next(iter(valid_loader))
         spectro, transcripts = valid_batch
         spectro = spectro.to(device)
 

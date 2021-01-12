@@ -50,13 +50,13 @@ class CTCModel(nn.Module):
                       padding=(20, 5)),
             nn.BatchNorm2d(32),
             nn.Hardtanh(0, 20, inplace=True),
-            nn.Conv2d(in_channels=32,
-                      out_channels=64,
-                      kernel_size=(21,11),
-                      stride=2,
-                      padding=(10, 5)),
-            nn.BatchNorm2d(64),
-            nn.Hardtanh(0, 20, inplace=True)
+            # nn.Conv2d(in_channels=32,
+            #           out_channels=64,
+            #           kernel_size=(21,11),
+            #           stride=2,
+            #           padding=(10, 5)),
+            # nn.BatchNorm2d(64),
+            # nn.Hardtanh(0, 20, inplace=True)
         )
 
         self.cell_type = cell_type
@@ -64,13 +64,13 @@ class CTCModel(nn.Module):
             raise NotImplementedError(f"Unrecognized cell type {cell_type}")
 
         cell_builder = getattr(nn, cell_type)
-        self.rnn = cell_builder(64*n_mels//8,
+        self.rnn = cell_builder(32*n_mels//4,
                                 self.num_hidden,
                                 num_layers=num_layers,
                                 bidirectional=True)
         self.charlin = nn.Sequential(
             nn.Linear(2*self.num_hidden,
-                      charmap.vocab_size + 1)  # add the blank
+                      charmap.vocab_size)  # the vocabulary contrains the blank
         )
         self.reset_parameters()
 
@@ -155,7 +155,7 @@ class CTCModel(nn.Module):
         # pack the cnn output, given there is no downsampling in the cnn
         # the lenghts are the same
         inputs = pack_padded_sequence(out_cnn,
-                                      lengths=lens_inputs//8)
+                                      lengths=lens_inputs//4)
 
         # Go through the RNN
         packed_outrnn, _ = self.rnn(inputs)  # seq, batch, num_hidden
@@ -195,20 +195,30 @@ class CTCModel(nn.Module):
             outputs = unpacked_outputs.log_softmax(dim=1)
             top_values, top_indices = outputs.topk(k=1, dim=1)
 
-            prob = -top_values.sum().item()
-            seq = [ci for ci in top_indices if ci != self.charmap.vocab_size]
+            # We look for a eos token
+            eos_token = self.charmap.eos
+            eos_pos = None
+            for ic, token in enumerate(seq):
+                if token == eos_token:
+                    eos_pos = ic
+            if eos_pos is None:
+                neg_log_prob = -top_values.sum()
+            else:
+                neg_log_prob = -top_values[:(eos_pos+1)].sum()
 
             # Remove the repetitions
             if len(seq) != 0:
                 last_char = seq[-1]
                 seq = [c1 for c1, c2 in zip(seq[:-1], seq[1:]) if c1 != c2]
                 seq.append(last_char)
+            
+            # Remove the blank 
+            seq = [c for c in seq if c != self.charmap.blankid]
 
             # Decode the list of integers
             seq = self.charmap.decode(seq)
 
-            # Drop out every blank
-            return [(prob, seq)]
+            return [(neg_log_prob, seq)]
 
     def beam_decode(self,
                     inputs: PackedSequence,

@@ -64,9 +64,9 @@ class CharMap(object):
     the conversions in the two directions
     """
 
+    _BLANK = 172
     _SOS = 182
     _EOS = 166
-    _PAD = 95
 
     def __init__(self):
         ord_chars = frozenset().union(
@@ -79,7 +79,7 @@ class CharMap(object):
         )
 
         # The pad symbol is added first to guarantee it has idx 0
-        self.idx2char = [chr(self._PAD)] + [chr(i) for i in ord_chars]
+        self.idx2char = [chr(self._BLANK)] + [chr(i) for i in ord_chars]
         self.char2idx = {
             c: idx for (idx, c) in enumerate(self.idx2char)
         }
@@ -115,8 +115,16 @@ class CharMap(object):
         return chr(self._EOS)
 
     @property
+    def eos(self):
+        return self.char2idx[self.eoschar]
+
+    @property
     def soschar(self):
         return chr(self._SOS)
+
+    @property
+    def blankid(self):
+        return self.char2idx[chr(self._BLANK)]
 
     def encode(self, utterance):
         utterance = self.soschar + utterance.lower() + self.eoschar
