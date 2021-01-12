@@ -198,13 +198,15 @@ class CTCModel(nn.Module):
             # We look for a eos token
             eos_token = self.charmap.eos
             eos_pos = None
-            for ic, token in enumerate(seq):
+            for ic, token in enumerate(top_indices):
                 if token == eos_token:
                     eos_pos = ic
             if eos_pos is None:
                 neg_log_prob = -top_values.sum()
+                seq = [c for c in top_indices]
             else:
                 neg_log_prob = -top_values[:(eos_pos+1)].sum()
+                seq = [c for c in top_indices[:(eos_pos+1)]]
 
             # Remove the repetitions
             if len(seq) != 0:
