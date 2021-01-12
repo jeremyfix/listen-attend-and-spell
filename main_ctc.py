@@ -62,7 +62,8 @@ def train(args):
                                    cuda=use_cuda,
                                    batch_size=args.batch_size,
                                    n_threads=args.nthreads,
-                                   small_experiment=args.debug,
+                                   min_duration=args.min_duration,
+                                   max_duration=args.max_duration,
                                    train_augment=args.train_augment,
                                    nmels=args.nmels,
                                    logger=logger)
@@ -237,9 +238,14 @@ if __name__ == '__main__':
                         type=float,
                         help="The maxnorm of the gradient to clip to",
                         default=400)
-    parser.add_argument("--debug",
-                        action="store_true",
-                        help="Whether to test on a small experiment")
+    parser.add_argument("--min_duration",
+                        type=float,
+                        help="The minimal duration of the waveform (s.)",
+                        default=1)
+    parser.add_argument("--max_duration",
+                        type=float,
+                        help="The maximal duration of the waveform (s.)",
+                        default=5)
     parser.add_argument("--num_epochs",
                         type=int,
                         help="The number of epochs to train for",

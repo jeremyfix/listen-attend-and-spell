@@ -8,6 +8,7 @@ import operator
 import logging
 from pathlib import Path
 from typing import Union, Tuple
+import pickle
 # External imports
 import torch.nn as nn
 from torch.nn.utils.rnn import pad_sequence, pack_padded_sequence, pad_packed_sequence, PackedSequence
@@ -55,6 +56,42 @@ def load_dataset(fold: str,
     datasetpath = os.path.join(commonvoice_root, commonvoice_version, lang)
     return COMMONVOICE(root=datasetpath,
                        tsv=fold+".tsv")
+
+
+class DatasetFilter(object):
+    """
+    Dataset object filtering an original dataset based on the 
+    durations of its waveform
+    """
+    
+
+    def __init__(self,
+                 ds: torch.utils.data.Dataset,
+                 min_duration: float,
+                 max_duration: float, 
+                 cachepath: Path):
+        """
+        Args:
+            ds: the dataset to filter
+            min_duration : the minimal duration in seconds
+            max_duration : the maximal duration in seconds
+            cachename : the filename in which to save the selected indices
+        """
+        # At construction we build a list of indices
+        # of valid samples from the original dataset
+        if os.path.exists(cachepath):
+            self.valid_indices = pickle.load(open(cachepath, "rb"))
+        else:
+            self.valid_indices = [i for i, (w, r, _) in enumerate(ds) if min_duration <= w.squeeze().shape[0] / r <= max_duration]
+            pickle.dump(self.valid_indices, open(cachepath, "wb"))
+        self.ds = ds
+
+
+    def __getitem__(self, idx):
+        return self.ds[self.valid_indices[idx]]
+
+    def __len__(self):
+        return len(self.valid_indices)
 
 
 class CharMap(object):
@@ -302,6 +339,8 @@ def get_dataloaders(commonvoice_root: str,
                     cuda: bool,
                     batch_size: int = 64,
                     n_threads: int = 4,
+                    min_duration: float = 1,
+                    max_duration: float = 5,
                     small_experiment:bool = False,
                     train_augment:bool = False,
                     nmels: int = _DEFAULT_NUM_MELS,
@@ -318,6 +357,10 @@ def get_dataloaders(commonvoice_root: str,
                       on the right device
         batch_size (int) : the number of samples per minibatch
         n_threads (int) : the number of threads to use for dataloading
+        min_duration (float) : the minimal duration of the recordings to
+                               consider
+        max_duration (float) : the maximal duration of the recordings to
+                               consider
         small_experiment (bool) : whether or not to use small subsets, usefull for debug
         train_augment (bool) : whether to use SpecAugment
         nmels (int) : the number of mel scales to consider
@@ -325,11 +368,18 @@ def get_dataloaders(commonvoice_root: str,
         normalize : wheter or not to center reduce the spectrograms
     """
 
-    dataset_loader = functools.partial(load_dataset,
-                                       commonvoice_root=commonvoice_root,
-                                       commonvoice_version=commonvoice_version)
-    train_dataset = dataset_loader("train")
+    def dataset_loader(fold):
+        return DatasetFilter(
+            ds = load_dataset(fold,
+                              commonvoice_root=commonvoice_root,
+                              commonvoice_version=commonvoice_version),
+            min_duration=min_duration,
+            max_duration=max_duration, 
+            cachepath = Path(fold + '.idx')
+        )
+
     valid_dataset = dataset_loader("dev")
+    train_dataset = dataset_loader("train")
     test_dataset = dataset_loader("test")
     if small_experiment:
         f = open('sorted_idx_train', 'r')
@@ -532,6 +582,8 @@ def ex_spectro():
                               _DEFAULT_COMMONVOICE_VERSION,
                               cuda=False,
                               n_threads=4,
+                              min_duration=1,
+                              max_duration=3,
                               batch_size=batch_size,
                               train_augment=True,
                               normalize=False)
@@ -578,6 +630,8 @@ def ex_augmented_spectro():
                               _DEFAULT_COMMONVOICE_VERSION,
                               cuda=False,
                               n_threads=4,
+                              min_duration=1,
+                              max_duration=3,
                               batch_size=batch_size,
                               train_augment=True,
                               normalize=False)
