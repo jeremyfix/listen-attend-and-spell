@@ -374,7 +374,7 @@ def get_dataloaders(commonvoice_root: str,
                               commonvoice_root=commonvoice_root,
                               commonvoice_version=commonvoice_version),
             min_duration=min_duration,
-            max_duration=max_duration, 
+            max_duration=max_duration,
             cachepath = Path(fold + '.idx')
         )
 
@@ -435,7 +435,7 @@ def get_dataloaders(commonvoice_root: str,
                                           spectro_normalization=normalization)
 
     print(f"Building a train loader with batch size = {batch_size}")
-    print(f"THe dataset contains {len(train_dataset)}")
+    print(f"The dataset contains {len(train_dataset)} samples")
     train_loader = torch.utils.data.DataLoader(train_dataset,
                                                batch_size=batch_size,
                                                shuffle=True,
