@@ -48,9 +48,9 @@ class CTCModel(nn.Module):
             nn.Dropout2d(dropout),
             nn.Conv2d(in_channels=32,
                       out_channels=32,
-                      kernel_size=(41,11),
-                      stride=2,
-                      padding=(20, 5)),
+                      kernel_size=(21,11),
+                      stride=(2, 1),
+                      padding=(10, 5)),
             nn.BatchNorm2d(32),
             nn.Hardtanh(0, 20, inplace=True),
             nn.Dropout2d(dropout)
@@ -1023,6 +1023,41 @@ def ex_pack():
                                                   batch_first=True)
 
 
+class bcolors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKCYAN = '\033[96m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+
+
+def test_model():
+    charmap = data.CharMap()
+    num_mels = 80
+    model = CTCModel(charmap,
+                     n_mels=num_mels,
+                     num_hidden=124,
+                     num_layers=3,
+                     cell_type='GRU',
+                     dropout=0.1)
+
+    T = 124
+    B = 10
+
+    cnn_inputs = torch.randn((T, B, num_mels))
+    cnn_inputs = cnn_inputs.transpose(0, 1).unsqueeze(dim=1)
+    out_cnn = model.cnn(cnn_inputs)
+
+    
+    print(out_cnn.shape)
+    print(bcolors.WARNING + " does not work " + bcolors.ENDC)
+
+
 if __name__ == '__main__':
-    ex_ctc()
-    ex_pack()
+    # ex_ctc()
+    # ex_pack()
+    test_model()
