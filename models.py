@@ -68,7 +68,7 @@ class CTCModel(nn.Module):
             raise NotImplementedError(f"Unrecognized cell type {cell_type}")
 
         cell_builder = getattr(nn, cell_type)
-        self.rnn = cell_builder(32*n_mels//4,
+        self.rnn = cell_builder(32*n_mels//2,
                                 self.num_hidden,
                                 num_layers=num_layers,
                                 bidirectional=True)
