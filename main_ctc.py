@@ -64,6 +64,7 @@ def train(args):
                                    n_threads=args.nthreads,
                                    min_duration=args.min_duration,
                                    max_duration=args.max_duration,
+                                   small_experiment=args.debug,
                                    train_augment=args.train_augment,
                                    nmels=args.nmels,
                                    logger=logger)
@@ -251,6 +252,9 @@ if __name__ == '__main__':
                         type=float,
                         help="The maximal duration of the waveform (s.)",
                         default=5)
+    parser.add_argument("--debug",
+                        action="store_true",
+                        help="Whether to use small datasets")
     parser.add_argument("--num_epochs",
                         type=int,
                         help="The number of epochs to train for",
