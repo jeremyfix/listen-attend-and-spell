@@ -84,7 +84,8 @@ def train(args):
                             n_mels,
                             n_hidden_rnn,
                             n_layers_rnn,
-                            cell_type)
+                            cell_type,
+                            args.dropout)
     decode = model.decode
     # decode = functools.partial(model.beam_decode, beam_size=10,
     #                            blank_id=blank_id)
@@ -100,7 +101,11 @@ def train(args):
         with torch.backends.cudnn.flags(enabled=False):
             return baseloss(* wrap_ctc_args(*params))
 
-    optimizer = optim.Adam(model.parameters(), lr=args.base_lr)
+    # optimizer = optim.Adam(model.parameters(), lr=args.base_lr)
+    optimizer = optim.AdamW(model.parameters(),
+                            lr=args.base_lr,
+                            weight_decay=args.weight_decay
+                           )
 
     metrics = {
         'CTC': loss
@@ -273,6 +278,10 @@ if __name__ == '__main__':
                         type=float,
                         help="The weight decay coefficient",
                         default=0.01)
+    parser.add_argument("--dropout",
+                        type=float,
+                        help="The dropout in the feedforward layers",
+                        default=0.1)
 
     # For testing/decoding
     parser.add_argument("--modelpath",

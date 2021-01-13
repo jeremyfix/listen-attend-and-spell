@@ -1,5 +1,8 @@
 # Pytorch implementation of Show, Attend and Tell \[Chan, 2016\]
 
+**Note** This is an experimental code that I used for preparing a labwork
+
+
 This is a tentative pytorch reimplementation of the image captioning network Listen, Attend and Spell.
 
 
@@ -60,3 +63,9 @@ python3 main.py train --nhidden_spell 8 --nhidden_listen 8 --dim_embed 24 --debu
 
 You can consider invoking `python3 -W ignore ...` since at the time of writing, we otherwise get several UserWarning on deprecated torch.rfft which make the terminal output unreadable.
 
+# References
+
+You might be interested in :
+
+- [Openseq2Seq from nvidia](https://nvidia.github.io/OpenSeq2Seq/html/speech-recognition/deepspeech2.html)
+- [Sean Naren deepspeech](https://github.com/SeanNaren/deepspeech.pytorch)

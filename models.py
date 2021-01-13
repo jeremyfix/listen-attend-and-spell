@@ -20,7 +20,8 @@ class CTCModel(nn.Module):
                  n_mels: int,
                  num_hidden: int,
                  num_layers: int,
-                 cell_type: str):
+                 cell_type: str,
+                 dropout: float):
         """
         Args:
             charmap (data.Charmap) : the character/int map
@@ -28,6 +29,7 @@ class CTCModel(nn.Module):
             num_hidden (int): number of LSTM cells per layer and per direction
             num_layers (int) : number of stacked RNN layers
             cell_type(str) either "GRU" or "LSTM"
+            dropout(float): the amount of dropout in the feedforward layers
         """
         super(CTCModel, self).__init__()
         self.charmap = charmap
@@ -43,6 +45,7 @@ class CTCModel(nn.Module):
                       padding=(20, 5)),
             nn.BatchNorm2d(32),
             nn.Hardtanh(0, 20, inplace=True),
+            nn.Dropout2d(dropout),
             nn.Conv2d(in_channels=32,
                       out_channels=32,
                       kernel_size=(41,11),
@@ -50,6 +53,7 @@ class CTCModel(nn.Module):
                       padding=(20, 5)),
             nn.BatchNorm2d(32),
             nn.Hardtanh(0, 20, inplace=True),
+            nn.Dropout2d(dropout)
             # nn.Conv2d(in_channels=32,
             #           out_channels=64,
             #           kernel_size=(21,11),
