@@ -382,18 +382,14 @@ def get_dataloaders(commonvoice_root: str,
     train_dataset = dataset_loader("train")
     test_dataset = dataset_loader("test")
     if small_experiment:
-        f = open('sorted_idx_train', 'r')
-        lines = f.readlines()
-        train_indices = [int(l.split(',')[0]) for l in lines[3*batch_size:4*batch_size]]
-        valid_test_indices = range(batch_size)
-        print(f"I took the train indices {train_indices}")
-        
+        indices = range(batch_size)
+
         train_dataset = torch.utils.data.Subset(train_dataset,
-                                                indices=train_indices)
+                                                indices=indices)
         valid_dataset = torch.utils.data.Subset(valid_dataset,
-                                                indices=valid_test_indices)
+                                                indices=indices)
         test_dataset = torch.utils.data.Subset(test_dataset,
-                                               indices=valid_test_indices)
+                                               indices=indices)
 
     if normalize:
         # Compute the normalization on the training set
