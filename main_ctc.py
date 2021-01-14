@@ -46,6 +46,30 @@ def wrap_ctc_args(packed_predictions, packed_targets):
     return unpacked_predictions, unpacked_targets, lens_predictions, lens_targets
 
 
+def decode_samples(fdecode, loader, n):
+    valid_batch = next(iter(loader))
+    spectro, transcripts = batch
+    spectro = spectro.to(device)
+
+    # unpacked_spectro is (T, B, n_mels)
+    unpacked_spectro, lens_spectro = pad_packed_sequence(spectro)
+
+    # unpacked_transcripts is (T, B)
+    unpacked_transcripts, lens_transcripts = pad_packed_sequence(transcripts)
+    # valid_batch is (T, B, n_mels)
+    for idxv in range(n):
+        spectrogram = unpacked_spectro[:, idxv, :].unsqueeze(dim=1)
+        spectrogram = pack_padded_sequence(spectrogram,
+                                           lengths=[lens_spectro[idxv]])
+        likely_sequences = fdecode(spectrogram)
+
+        decoding_results += "\nGround truth : " + charmap.decode(unpacked_transcripts[:, idxv]) + '\n'
+        decoding_results += "Log prob     Sequence\n"
+        decoding_results += "\n".join(["{:.2f}        {}".format(p, s) for (p, s) in likely_sequences])
+        decoding_results += '\n'
+    
+    return decoding_results
+
 def train(args):
     """
     Training of the algorithm
@@ -102,11 +126,11 @@ def train(args):
         with torch.backends.cudnn.flags(enabled=False):
             return baseloss(* wrap_ctc_args(*params))
 
-    # optimizer = optim.Adam(model.parameters(), lr=args.base_lr)
-    optimizer = optim.AdamW(model.parameters(),
-                            lr=args.base_lr,
-                            weight_decay=args.weight_decay
-                           )
+    optimizer = optim.Adam(model.parameters(), lr=args.base_lr)
+    # optimizer = optim.AdamW(model.parameters(),
+    #                         lr=args.base_lr,
+    #                         weight_decay=args.weight_decay
+    #                        )
 
     metrics = {
         'CTC': loss
@@ -181,29 +205,13 @@ def train(args):
                                           e+1)
         # Try to decode some of the validation samples
         model.eval()
-        decoding_results = "## Decoding results on the validation set\n"
+        valid_decodings = decode_samples(decode, valid_loader, n=2)
+        train_decodings = decode_samples(decode, train_loader, n=2)
 
-        valid_batch = next(iter(valid_loader))
-        spectro, transcripts = valid_batch
-        spectro = spectro.to(device)
-
-        # unpacked_spectro is (T, B, n_mels)
-        unpacked_spectro, lens_spectro = pad_packed_sequence(spectro)
-
-        # unpacked_transcripts is (T, B)
-        unpacked_transcripts, lens_transcripts = pad_packed_sequence(transcripts)
-        # valid_batch is (T, B, n_mels)
-        for idxv in range(5):
-            spectrogram = unpacked_spectro[:, idxv, :].unsqueeze(dim=1)
-            spectrogram = pack_padded_sequence(spectrogram,
-                                               lengths=[lens_spectro[idxv]])
-            likely_sequences = decode(spectrogram)
-
-            decoding_results += "\nGround truth : " + charmap.decode(unpacked_transcripts[:, idxv]) + '\n'
-            decoding_results += "Log prob     Sequence\n"
-            decoding_results += "\n".join(["{:.2f}        {}".format(p, s) for (p, s) in likely_sequences])
-            decoding_results += '\n'
-        print(decoding_results)
+        decoding_results = "## Decoding results on the training set\n"
+        decoding_results += train_decodings
+        decoding_results += "## Decoding results on the validation set\n"
+        decoding_results += valid_decodings
         tensorboard_writer.add_text("Decodings",
                                     deepcs.display.htmlize(decoding_results),
                                     global_step=e+1)
@@ -231,15 +239,15 @@ if __name__ == '__main__':
     parser.add_argument("--nthreads",
                        type=int,
                        help="The number of threads to use for loading the data",
-                       default=4)
+                       default=6)
     parser.add_argument("--batch_size",
                        type=int,
                        help="The size of the minibatch",
-                       default=64)
+                       default=128)
     parser.add_argument("--base_lr",
                         type=float,
                         help="The base learning rate for the optimizer",
-                        default=0.0005)
+                        default=0.001)
     parser.add_argument("--grad_clip",
                         type=float,
                         help="The maxnorm of the gradient to clip to",
@@ -258,7 +266,7 @@ if __name__ == '__main__':
     parser.add_argument("--num_epochs",
                         type=int,
                         help="The number of epochs to train for",
-                        default=150)
+                        default=50)
     parser.add_argument("--train_augment",
                         action="store_true",
                         help="Whether to use or not SpecAugment during training")
@@ -273,7 +281,7 @@ if __name__ == '__main__':
     parser.add_argument("--nhidden_rnn",
                         type=int,
                         help="The number of units per recurrent layer",
-                        default=512)
+                        default=1024)
     parser.add_argument("--cell_type",
                         choices=["GRU", "LSTM"],
                         default="GRU",
