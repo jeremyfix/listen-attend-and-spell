@@ -46,11 +46,12 @@ def wrap_ctc_args(packed_predictions, packed_targets):
     return unpacked_predictions, unpacked_targets, lens_predictions, lens_targets
 
 
-def decode_samples(fdecode, loader, n):
-    valid_batch = next(iter(loader))
+def decode_samples(fdecode, loader, n, device, charmap):
+    batch = next(iter(loader))
     spectro, transcripts = batch
     spectro = spectro.to(device)
 
+    decoding_results = ""
     # unpacked_spectro is (T, B, n_mels)
     unpacked_spectro, lens_spectro = pad_packed_sequence(spectro)
 
@@ -205,8 +206,10 @@ def train(args):
                                           e+1)
         # Try to decode some of the validation samples
         model.eval()
-        valid_decodings = decode_samples(decode, valid_loader, n=2)
-        train_decodings = decode_samples(decode, train_loader, n=2)
+        valid_decodings = decode_samples(decode, valid_loader, n=2,
+                                         device=device, charmap=charmap)
+        train_decodings = decode_samples(decode, train_loader, n=2,
+                                         device=device, charmap=charmap)
 
         decoding_results = "## Decoding results on the training set\n"
         decoding_results += train_decodings
@@ -215,6 +218,7 @@ def train(args):
         tensorboard_writer.add_text("Decodings",
                                     deepcs.display.htmlize(decoding_results),
                                     global_step=e+1)
+        logger.info(decoding_results)
 
 
 if __name__ == '__main__':
