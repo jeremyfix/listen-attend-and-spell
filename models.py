@@ -55,11 +55,11 @@ class CTCModel(nn.Module):
             nn.Hardtanh(0, 20, inplace=True),
             nn.Dropout2d(dropout)
             # nn.Conv2d(in_channels=32,
-            #           out_channels=64,
+            #           out_channels=32,
             #           kernel_size=(21,11),
-            #           stride=2,
+            #           stride=(2, 1),
             #           padding=(10, 5)),
-            # nn.BatchNorm2d(64),
+            # nn.BatchNorm2d(32),
             # nn.Hardtanh(0, 20, inplace=True)
         )
 
