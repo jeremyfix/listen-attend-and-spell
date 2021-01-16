@@ -207,9 +207,9 @@ class WaveformProcessor(object):
 
         self.spectro_normalization = spectro_normalization
 
-        time_mask_duration = 0.5  # s.
+        time_mask_duration = 0.1  # s.
         time_mask_nsamples = int(time_mask_duration / win_step)
-        nmel_mask = nmels//3
+        nmel_mask = nmels//4
 
         self.transform_augment = None
         if augment:
