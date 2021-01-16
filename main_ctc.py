@@ -218,6 +218,92 @@ def train(args):
         logger.info(decoding_results)
 
 
+def test(args):
+    """
+    Test function to decode a sample with a pretrained model
+    """
+    import matplotlib.pyplot as plt
+
+    logger = logging.getLogger(__name__)
+    logger.info("Test")
+
+    use_cuda = torch.cuda.is_available()
+    device = torch.device('cuda') if use_cuda else torch.device('cpu')
+
+    # We need the char map to know about the vocabulary size
+    charmap = data.CharMap()
+
+    # Create the model
+    # It is required to build up the same architecture than the one
+    # used during training. If you do not remember the parameters
+    # check the summary.txt file in the logdir where you have you
+    # modelpath pt file saved. A better way to handle that
+    # would be to use yaml files containing the hyperparameters for
+    # training and load this yaml file when loading.
+    n_mels = args.nmels
+    nhidden_rnn = args.nhidden_rnn
+    nlayers_rnn = args.nlayers_rnn
+    cell_type = args.cell_type
+    dropout = args.dropout
+
+    modelpath = args.modelpath
+    audiofile = args.audiofile
+    beamwidth = args.beamwidth
+    assert(modelpath is not None)
+    assert(audiofile is not None)
+
+    logger.info("Building the model")
+    model = models.CTCModel(charmap,
+                            n_mels,
+                            nhidden_rnn,
+                            nlayers_rnn,
+                            cell_type,
+                            dropout)
+    model.to(device)
+    model.load_state_dict(torch.load(modelpath))
+
+    # Switch the model to eval mode
+    model.eval()
+
+    # Load and preprocess the audiofile
+    logger.info("Loading and preprocessing the audio file")
+    waveform, sample_rate = torchaudio.load(audiofile)
+    waveform = torchaudio.transforms.Resample(sample_rate, data._DEFAULT_RATE)(waveform).transpose(0, 1)  # (T, B)
+    # Hardcoded normalization, this is dirty, I agree
+    spectro_normalization = (-31, 32)
+    # The processor for computing the spectrogram
+    waveform_processor = data.WaveformProcessor(data._DEFAULT_RATE,
+                                                data._DEFAULT_WIN_LENGTH*1e-3,
+                                                data._DEFAULT_WIN_STEP*1e-3,
+                                                n_mels,
+                                                False,
+                                                spectro_normalization)
+    spectrogram = waveform_processor(waveform).to(device)
+    spectro_length = spectrogram.shape[0]
+    print(spectrogram.shape)
+
+    # Plot the spectrogram
+    logger.info("Plotting the spectrogram")
+    fig = plt.figure()
+    ax = fig.add_subplot()
+    ax.imshow(spectrogram[0].cpu().numpy(),
+              aspect='equal', cmap='magma', origin='lower')
+    ax.set_xlabel("Mel scale")
+    ax.set_ylabel("Time (sample)")
+    fig.tight_layout()
+    plt.savefig("spectro_test.png")
+
+    spectrogram = pack_padded_sequence(spectrogram,
+                                       lengths=[spectro_length])
+
+    logger.info("Decoding the spectrogram")
+    # likely_sequences = model.decode(spectrogram)
+    likely_sequences = model.beam_decode(spectrogram,
+                                         beamwidth, 
+                                         charmap.blankid)
+    print("Log prob    Sequence\n")
+    print("\n".join(["{:.2f}      {}".format(p, s) for (p, s) in likely_sequences]))
+
 if __name__ == '__main__':
     logging.basicConfig()
     logger = logging.getLogger(__name__)
@@ -299,10 +385,19 @@ if __name__ == '__main__':
     # For testing/decoding
     parser.add_argument("--modelpath",
                         type=Path,
-                        help="The pt path to load")
+                        help="The pt path to load",
+                        default=None)
     parser.add_argument("--audiofile",
                         type=Path,
-                        help="The path to the audio file to transcript")
+                        help="The path to the audio file to transcript",
+                        default=None)
+    parser.add_argument("--beamwidth",
+                        type=int,
+                        help="The number of alternative decoding hypotheses"
+                        " to consider in parallel",
+                        default=10)
+
+
 
     args = parser.parse_args()
 
