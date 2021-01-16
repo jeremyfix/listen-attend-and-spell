@@ -249,6 +249,7 @@ def test(args):
     modelpath = args.modelpath
     audiofile = args.audiofile
     beamwidth = args.beamwidth
+    beamsearch = args.beamsearch
     assert(modelpath is not None)
     assert(audiofile is not None)
 
@@ -280,7 +281,6 @@ def test(args):
                                                 spectro_normalization)
     spectrogram = waveform_processor(waveform).to(device)
     spectro_length = spectrogram.shape[0]
-    print(spectrogram.shape)
 
     # Plot the spectrogram
     logger.info("Plotting the spectrogram")
@@ -297,10 +297,14 @@ def test(args):
                                        lengths=[spectro_length])
 
     logger.info("Decoding the spectrogram")
-    # likely_sequences = model.decode(spectrogram)
-    likely_sequences = model.beam_decode(spectrogram,
-                                         beamwidth, 
-                                         charmap.blankid)
+    
+    if beamsearch:
+        likely_sequences = model.beam_decode(spectrogram,
+                                             beamwidth, 
+                                             charmap.blankid)
+    else:
+        likely_sequences = model.decode(spectrogram)
+
     print("Log prob    Sequence\n")
     print("\n".join(["{:.2f}      {}".format(p, s) for (p, s) in likely_sequences]))
 
@@ -396,7 +400,10 @@ if __name__ == '__main__':
                         help="The number of alternative decoding hypotheses"
                         " to consider in parallel",
                         default=10)
-
+    parser.add_argument("--beamsearch",
+                        action="store_true",
+                        help="Whether or not to use beam search. If not, use"
+                        " max decoding.")
 
 
     args = parser.parse_args()
