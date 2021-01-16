@@ -619,7 +619,7 @@ def ex_spectro():
                               cuda=False,
                               n_threads=4,
                               min_duration=1,
-                              max_duration=3,
+                              max_duration=5,
                               batch_size=batch_size,
                               train_augment=True,
                               normalize=False)
