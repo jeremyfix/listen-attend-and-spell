@@ -210,19 +210,17 @@ class WaveformProcessor(object):
         self.transform_tospectro = nn.Sequential(*modules)
         #SOL@
 
-        #@SOL
         self.transform_augment = None
         if augment:
-            time_mask_duration = 0.5  # s.
+            time_mask_duration = 0.1  # s.
             time_mask_nsamples = int(time_mask_duration / win_step)
-            nmel_mask = nmels//3
+            nmel_mask = nmels//4
 
             modules = [
                 FrequencyMasking(nmel_mask),
                 TimeMasking(time_mask_nsamples)
             ]
             self.transform_augment = nn.Sequential(*modules)
-        #SOL@
         ##########################
         #### STOP CODING HERE ####
         ##########################
