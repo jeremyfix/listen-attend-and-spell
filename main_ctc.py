@@ -122,10 +122,7 @@ def train(args):
     baseloss = nn.CTCLoss(blank=blank_id,
                           reduction='mean',
                           zero_infinity=True)
-    # loss = lambda *params: baseloss(* wrap_ctc_args(*params))
-    def loss(*params):
-        with torch.backends.cudnn.flags(enabled=False):
-            return baseloss(* wrap_ctc_args(*params))
+    loss = lambda *params: baseloss(* wrap_ctc_args(*params))
 
     optimizer = optim.Adam(model.parameters(), lr=args.base_lr)
     # optimizer = optim.AdamW(model.parameters(),
