@@ -42,7 +42,7 @@ def wrap_ctc_args(packed_predictions, packed_targets):
     unpacked_targets = unpacked_targets.transpose(0, 1)  # B, T
     # Stack the subslices of the tensors
     unpacked_targets = torch.cat([batchi[:ti] for batchi, ti in zip(unpacked_targets, lens_targets)])
-    
+
     return unpacked_predictions, unpacked_targets, lens_predictions, lens_targets
 
 
@@ -57,6 +57,7 @@ def decode_samples(fdecode, loader, n, device, charmap):
 
     # unpacked_transcripts is (T, B)
     unpacked_transcripts, lens_transcripts = pad_packed_sequence(transcripts)
+
     # valid_batch is (T, B, n_mels)
     for idxv in range(n):
         spectrogram = unpacked_spectro[:, idxv, :].unsqueeze(dim=1)
@@ -68,8 +69,9 @@ def decode_samples(fdecode, loader, n, device, charmap):
         decoding_results += "Log prob     Sequence\n"
         decoding_results += "\n".join(["{:.2f}        {}".format(p, s) for (p, s) in likely_sequences])
         decoding_results += '\n'
-    
+
     return decoding_results
+
 
 def train(args):
     """
@@ -95,26 +97,39 @@ def train(args):
                                    logger=logger)
     train_loader, valid_loader, test_loader = loaders
 
+
+    # Parameters
+    n_mels = args.nmels
+    nhidden_rnn = args.nhidden_rnn
+    nlayers_rnn = args.nlayers_rnn
+    cell_type = args.cell_type
+    dropout = args.dropout
+    base_lr = args.base_lr
+    num_epochs = args.num_epochs
+    grad_clip = args.grad_clip
+
     # We need the char map to know about the vocabulary size
     charmap = data.CharMap()
+    blank_id = charmap.blankid
 
     # Model definition
-    n_mels = args.nmels
-    n_hidden_rnn = args.nhidden_rnn
-    n_layers_rnn = args.nlayers_rnn
-    blank_id = charmap.blankid
-    cell_type = args.cell_type
-
-    num_model_args = 1
+    ###########################
+    #### START CODING HERE ####
+    ###########################
+    #@TEMPL@model = None
+    #@SOL
     model = models.CTCModel(charmap,
                             n_mels,
-                            n_hidden_rnn,
-                            n_layers_rnn,
+                            nhidden_rnn,
+                            nlayers_rnn,
                             cell_type,
-                            args.dropout)
+                            dropout)
+    #SOL@
+    ##########################
+    #### STOP CODING HERE ####
+    ##########################
+
     decode = model.decode
-    # decode = functools.partial(model.beam_decode, beam_size=10,
-    #                            blank_id=blank_id)
 
     model.to(device)
 
@@ -122,23 +137,23 @@ def train(args):
     baseloss = nn.CTCLoss(blank=blank_id,
                           reduction='mean',
                           zero_infinity=True)
-    # loss = lambda *params: baseloss(* wrap_ctc_args(*params))
-    def loss(*params):
-        with torch.backends.cudnn.flags(enabled=False):
-            return baseloss(* wrap_ctc_args(*params))
+    loss = lambda *params: baseloss(* wrap_ctc_args(*params))
 
-    optimizer = optim.Adam(model.parameters(), lr=args.base_lr)
-    # optimizer = optim.AdamW(model.parameters(),
-    #                         lr=args.base_lr,
-    #                         weight_decay=args.weight_decay
-    #                        )
+    ###########################
+    #### START CODING HERE ####
+    ###########################
+    #@TEMPL@optimizer = None
+    optimizer = optim.Adam(model.parameters(), lr=base_lr)  #@SOL@
+    ##########################
+    #### STOP CODING HERE ####
+    ##########################
 
     metrics = {
         'CTC': loss
     }
 
     # Callbacks
-    summary_text = "## Summary of the model architecture\n"+ \
+    summary_text = "## Summary of the model architecture\n" + \
             f"{deepcs.display.torch_summarize(model)}\n"
     summary_text += "\n\n## Executed command :\n" +\
         "{}".format(" ".join(sys.argv))
@@ -161,15 +176,15 @@ def train(args):
     scheduler = lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.5)
 
     # Training loop
-    for e in range(args.num_epochs):
+    for e in range(num_epochs):
         ftrain(model,
                train_loader,
                loss,
                optimizer,
                device,
                metrics,
-               grad_clip=args.grad_clip,
-               num_model_args=num_model_args,
+               grad_clip=grad_clip,
+               num_model_args=1,
                num_epoch=e,
                tensorboard_writer=tensorboard_writer)
 
@@ -178,12 +193,12 @@ def train(args):
                               valid_loader,
                               device,
                               metrics,
-                              num_model_args=num_model_args)
+                              num_model_args=1)
         better_model = model_checkpoint.update(valid_metrics['CTC'])
         scheduler.step()
 
         logger.info("[%d/%d] Validation:   CTCLoss : %.3f %s"% (e,
-                                                                args.num_epochs,
+                                                                num_epochs,
                                                                 valid_metrics['CTC'],
                                                                 "[>> BETTER <<]" if better_model else ""))
 
@@ -196,9 +211,9 @@ def train(args):
                              test_loader,
                              device,
                              metrics,
-                             num_model_args=num_model_args)
+                             num_model_args=1)
         logger.info("[%d/%d] Test:   Loss : %.3f "% (e,
-                                                     args.num_epochs,
+                                                     num_epochs,
                                                      test_metrics['CTC']))
         for m_name, m_value in test_metrics.items():
             tensorboard_writer.add_scalar(f'metrics/test_{m_name}',
@@ -218,7 +233,7 @@ def train(args):
         tensorboard_writer.add_text("Decodings",
                                     deepcs.display.htmlize(decoding_results),
                                     global_step=e+1)
-        logger.info(decoding_results)
+        logger.info("\n" + decoding_results)
 
 
 if __name__ == '__main__':
@@ -229,6 +244,28 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("command",
                         choices=['train', 'test'])
+    # Training parameters
+    parser.add_argument("--batch_size",
+                       type=int,
+                       help="The size of the minibatch",
+                       default=128)
+    parser.add_argument("--debug",
+                        action="store_true",
+                        help="Whether to use small datasets")
+    parser.add_argument("--num_epochs",
+                        type=int,
+                        help="The number of epochs to train for",
+                        default=50)
+    parser.add_argument("--base_lr",
+                        type=float,
+                        help="The base learning rate for the optimizer",
+                        default=0.0005)
+    parser.add_argument("--grad_clip",
+                        type=float,
+                        help="The maxnorm of the gradient to clip to",
+                        default=None)
+
+    # Data parameters
     parser.add_argument("--datasetversion",
                         choices=['v1', 'v6.1'],
                         default=data._DEFAULT_COMMONVOICE_VERSION,
@@ -238,24 +275,12 @@ if __name__ == '__main__':
                         default=data._DEFAULT_COMMONVOICE_ROOT,
                         help="The root directory holding the datasets. "
                         " These are supposed to be datasetroot/v1/fr or "
-                        " datasetroot/v6.1/fr"
-                       )
+                        " datasetroot/v6.1/fr")
     parser.add_argument("--nthreads",
-                       type=int,
-                       help="The number of threads to use for loading the data",
-                       default=6)
-    parser.add_argument("--batch_size",
-                       type=int,
-                       help="The size of the minibatch",
-                       default=128)
-    parser.add_argument("--base_lr",
-                        type=float,
-                        help="The base learning rate for the optimizer",
-                        default=0.001)
-    parser.add_argument("--grad_clip",
-                        type=float,
-                        help="The maxnorm of the gradient to clip to",
-                        default=400)
+                        type=int,
+                        help="The number of threads to use for "
+                        "loading the data",
+                        default=6)
     parser.add_argument("--min_duration",
                         type=float,
                         help="The minimal duration of the waveform (s.)",
@@ -264,20 +289,12 @@ if __name__ == '__main__':
                         type=float,
                         help="The maximal duration of the waveform (s.)",
                         default=5)
-    parser.add_argument("--debug",
-                        action="store_true",
-                        help="Whether to use small datasets")
-    parser.add_argument("--num_epochs",
-                        type=int,
-                        help="The number of epochs to train for",
-                        default=50)
-    parser.add_argument("--train_augment",
-                        action="store_true",
-                        help="Whether to use or not SpecAugment during training")
     parser.add_argument("--nmels",
                         type=int,
                         help="The number of scales in the MelSpectrogram",
                         default=data._DEFAULT_NUM_MELS)
+
+    # Model parameters
     parser.add_argument("--nlayers_rnn",
                         type=int,
                         help="The number of RNN layers",
@@ -290,6 +307,12 @@ if __name__ == '__main__':
                         choices=["GRU", "LSTM"],
                         default="GRU",
                         help="The type of reccurent memory cell")
+
+    # Regularization
+    parser.add_argument("--train_augment",
+                        action="store_true",
+                        help="Whether to use or not SpecAugment "
+                        "during training")
     parser.add_argument("--weight_decay",
                         type=float,
                         help="The weight decay coefficient",
