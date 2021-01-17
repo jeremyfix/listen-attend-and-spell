@@ -87,7 +87,7 @@ class CTCModel(nn.Module):
         #@TEMPL@self.charlin = None
         #@SOL
         self.charlin = nn.Sequential(
-            nn.Linear(2*self.num_hidden,
+            nn.Linear(2*self.nhidden_rnn,
                       charmap.vocab_size)  # the vocabulary contrains the blank
         )
         #SOL@
