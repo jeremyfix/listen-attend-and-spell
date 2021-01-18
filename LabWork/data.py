@@ -716,14 +716,52 @@ def order_by_length():
         sorted_idx = forder(dataset_loader(k))
         with open(f"sorted_idx_{k}", "w") as f:
             f.write("\n".join(f"{idxi},{leni}" for leni, idxi in sorted_idx))
+
+
+def test_spectro():
+    dataset = load_dataset("train",
+                           _DEFAULT_COMMONVOICE_ROOT,
+                           _DEFAULT_COMMONVOICE_VERSION)
+
+    # Take one of the waveforms 
+    idx = 10
+    waveform, rate, dictionary = dataset[idx]
+
+    waveform = waveform.transpose(0, 1)
+    print(waveform.shape)
+
+    win_step = _DEFAULT_WIN_STEP*1e-3
+    trans_mel_spectro = WaveformProcessor(rate=rate,
+                                          win_length=_DEFAULT_WIN_LENGTH*1e-3,
+                                          win_step=win_step,
+                                          nmels=_DEFAULT_NUM_MELS,
+                                          augment=False,
+                                          spectro_normalization=None)
+    mel_spectro = trans_mel_spectro(waveform).squeeze()  # (T, N_MELS)
+
+    fig = plt.figure(figsize=(10, 2))
+    ax = fig.add_subplot()
+
+    im = ax.imshow(mel_spectro.T,
+                   extent=[0, mel_spectro.shape[0]*win_step,
+                           0, mel_spectro.shape[1]],
+                   aspect='auto',
+                   cmap='magma',
+                   origin='lower')
+    ax.set_ylabel('Mel scale')
+    ax.set_xlabel('TIme (s.)')
+    ax.set_title('Log mel spectrogram')
+    plt.colorbar(im)
+    plt.tight_layout()
+    plt.show()
+
 #SOL@                
-
-
 if __name__ == '__main__':
     #@TEMPL@pass
     #@SOL
     # order_by_length()
-    ex_charmap()
+    # ex_charmap()
+    # test_spectro()
     # ex_waveform_spectro()
     # ex_spectro()
     # ex_augmented_spectro()
