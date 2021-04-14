@@ -474,7 +474,6 @@ def ex_pack():
 
 
 if __name__ == '__main__':
-    # ex_ctc()
-    # ex_pack()
-    test_model()
+    ex_ctc()
+    ex_pack()
 #SOL@
