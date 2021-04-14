@@ -522,7 +522,7 @@ def plot_spectro(spectrogram: torch.Tensor,
     plt.tight_layout()
 
 #@SOL
-def ex_charmap():
+def test_charmap():
     charmap = CharMap()
 
     print(f"The charmap contains {len(charmap.idx2char)} symbols")
@@ -740,6 +740,7 @@ def test_spectro():
                                           augment=False,
                                           spectro_normalization=None)
     mel_spectro = trans_mel_spectro(waveform).squeeze()  # (T, N_MELS)
+    print(waveform.shape, mel_spectro.shape)
 
     fig = plt.figure(figsize=(10, 2))
     ax = fig.add_subplot()
@@ -762,8 +763,8 @@ if __name__ == '__main__':
     #@TEMPL@pass
     #@SOL
     # order_by_length()
-    ex_charmap()
-    # test_spectro()
+    test_charmap()
+    test_spectro()
     # ex_waveform_spectro()
     # ex_spectro()
     # ex_augmented_spectro()
