@@ -114,7 +114,7 @@ For the conversion, I decided to convert to lower case, to remove the accents, t
 
 To run this test, run the 
 
-```.python
+```python
 
 import scripts.data as data
 
