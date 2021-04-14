@@ -112,6 +112,16 @@ If you decode it back into characters, you then get a slightly different sentenc
 
 For the conversion, I decided to convert to lower case, to remove the accents, to convert the punctuation to either a period or a space. The charmap contains 44 symbols.
 
+To run this test, run the 
+
+```.python
+
+import scripts.data as data
+
+data.test_charmap()
+
+```
+
 Note: At the time of writing, there is some issues with the encoding of some special characters (like œ or ç)are not correctly handled.
 
 # References
