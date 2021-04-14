@@ -38,15 +38,6 @@ series = {ICML'16}
 
 The data we use are provided by the [Common voice Mozilla project](https://commonvoice.mozilla.org/en). In this project, we use the [French dataset](https://commonvoice.mozilla.org/en/datasets). You need to manually download the files and extract the archive somewhere on your drive; torchaudio cannot download the data for you since you need to accept the Mozilla terms for using the common voice datasets.
 
-Computing the spectrogram with a Short Time Fourier Transform (window size of 25ms with a window step of 15 ms), we get the example spectrograms in Mel scale (with 80 filters) below :
-
-![Spectrogram](https://raw.githubusercontent.com/jeremyfix/listen-attend-and-spell/main/figs/spectro.png)
-
-The pipeline for processing the waveform is depicted below :
-
-![Waveform to spectrogram](https://raw.githubusercontent.com/jeremyfix/listen-attend-and-spell/main/figs/waveform_to_spectro.png)
-
-This transformation of waveforms to logmel spectrograms is done in the WaveProcessor object.
 
 ## Vocabulary
 
@@ -74,6 +65,41 @@ python3 main.py train --nhidden_spell 8 --nhidden_listen 8 --dim_embed 24 --debu
 ```
 
 You can consider invoking `python3 -W ignore ...` since at the time of writing, we otherwise get several UserWarning on deprecated torch.rfft which make the terminal output unreadable.
+
+# Explanations
+
+## Input data encoding: waveforms to spectrograms
+
+The task consists in transforming a recorded waveform into the textual transcript. As input, we have the waveforms, which can be of varying duration. The neural network will not work directly on the waveform but will take as input a spectrogram. The pipeline for processing the waveform is depicted below :
+
+![Waveform to spectrogram](https://raw.githubusercontent.com/jeremyfix/listen-attend-and-spell/main/figs/waveform_to_spectro.png)
+
+Computing the spectrogram with a Short Time Fourier Transform (window size of 25ms with a window step of 15 ms), we get the example spectrograms in Mel scale (with 80 filters) below :
+
+![Spectrogram](https://raw.githubusercontent.com/jeremyfix/listen-attend-and-spell/main/figs/spectro.png)
+
+In the code `scripts/data.py`, the data are loaded by the data.py:get_dataloaders function which :
+
+- loads the data
+- filter out the waveforms that are too short or too long in duration (by default selects only the samples between 1s. and 5s.)
+- normalize the spectrograms by subtracting the mean and dividing by the variance 
+
+A dataloader, when iterated, is returning mini batches. In the provided code, the waveforms in the minibatches are right-padded (see the BatchCollate:__call__ function) to be of the same duration. The spectrogram computation, and possibly data augmentation by frequency and time masking, is performed by the WaveformProcessor object. 
+
+## Output data encoding: transcripts
+
+The transcripts have to be encoded as integers with a specified vocabulary which is handled by the `CharMap` object. It adds a start of sequence tag and an end of sequence tag, converts all characters to their corresponding index in the charmap and pads the transcripts so that they are all of the same size. The padding character (so called blank character) is very specific and we use the index 0 for it which is the default of the pytorch CTC loss which is the loss used for the deepspeech model. When computed, the CTC loss needs to know where the true output sequence is ending.
+
+So, if you take a real transcript, in French obviously, in a minibatch where the maximum transcript length is , like :
+
+...
+
+it gets encoded as :
+
+...
+
+
+Note: At the time of writing, there is some issues with the encoding of some special characters (like œ or ç)are not correctly handled.
 
 # References
 

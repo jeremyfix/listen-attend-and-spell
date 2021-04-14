@@ -707,8 +707,8 @@ def order_by_length():
     dataset_loader = functools.partial(load_dataset,
                                        commonvoice_root=_DEFAULT_COMMONVOICE_ROOT,
                                        commonvoice_version=_DEFAULT_COMMONVOICE_VERSION)
-       
-    def forder(ds):    
+
+    def forder(ds):
         idx_lens = [(w.shape[1], itrain) for itrain, (w, _, _) in enumerate(ds)]
         return sorted(idx_lens, key=lambda wi: wi[0])
     for k in ["dev", "test", "train"]:
@@ -723,7 +723,7 @@ def test_spectro():
                            _DEFAULT_COMMONVOICE_ROOT,
                            _DEFAULT_COMMONVOICE_VERSION)
 
-    # Take one of the waveforms 
+    # Take one of the waveforms
     idx = 10
     waveform, rate, dictionary = dataset[idx]
 
