@@ -86,6 +86,8 @@ In the code `scripts/data.py`, the data are loaded by the data.py:get_dataloader
 
 A dataloader, when iterated, is returning mini batches. In the provided code, the waveforms in the minibatches are right-padded (see the BatchCollate:__call__ function) to be of the same duration. The spectrogram computation, and possibly data augmentation by frequency and time masking, is performed by the WaveformProcessor object. 
 
+The CommonVoice data are sampled at 48 kHz. Here, during the processing, the waveforms are resampled at 16 kHz. The FFT is done on windows of 25 ms and shifted by 15 ms. Hence, a sample of 5 seconds will produce an original waveform of 240.000 samples, a resampled waveform of 80.000 samples and a spectrogram of 330 samples. Given a FFT with a shift 15 ms, we also have a spectrogram at almost 67 Hz. The melscale, as in deepspeech2, we use 80 scales. The processing of the waveforms is done with [torchaudio](https://pytorch.org/audio/stable/index.html).
+
 ## Output data encoding: transcripts
 
 The transcripts have to be encoded as integers with a specified vocabulary which is handled by the [data.CharMap](https://github.com/jeremyfix/listen-attend-and-spell/blob/05dc9aa60055b318625e40cec8141fa1fa69054c/data.py#L37) object. It adds a start of sequence tag and an end of sequence tag, converts all characters to their corresponding index in the charmap and pads the transcripts so that they are all of the same size. The padding character (so called blank character) is very specific and we use the index 0 for it which is the default of the pytorch CTC loss which is the loss used for the deepspeech model. When computed, the CTC loss needs to know where the true output sequence is ending.
