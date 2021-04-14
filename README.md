@@ -1,6 +1,6 @@
 # Pytorch implementation of Show, Attend and Tell \[Chan, 2016\] and DeepSpeech models
 
-**Note** This is an experimental code that I used for preparing a labwork. Hence the code is full of symbols "@SOL@" or so that I use for getting a template script code for the students with the [easylabwork](https://github.com/jeremyfix/easylabwork) package. By the way, if you forget about these tags, the code can be ran for training and testing speech to text models.
+**Note** This is an experimental code that I used for preparing a labwork. Hence the code is full of symbols "@SOL@" or so that I use for getting a template script code for the students with the [easylabwork](https://github.com/jeremyfix/easylabwork) package. By the way, if you forget about these tags, the code can be ran for training and testing speech to text models. For the students to test their implementation, they are provided with the test_implementation.py script which runs some unitary tests.
 
 The two models I consider are the CTC based model DeepSpeech [Amodei(2015)] and the attentive Seq2Seq model Listen, Attend and Spell [Chan(2016)].
 
