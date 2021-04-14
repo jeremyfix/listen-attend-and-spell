@@ -120,3 +120,5 @@ You might be interested in :
 
 - [Openseq2Seq from nvidia](https://nvidia.github.io/OpenSeq2Seq/html/speech-recognition/deepspeech2.html)
 - [Sean Naren deepspeech](https://github.com/SeanNaren/deepspeech.pytorch)
+- [Coqui STT](https://stt.readthedocs.io/en/latest/)
+- [Mozilla deepspeech](https://github.com/mozilla/DeepSpeech)
