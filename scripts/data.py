@@ -525,6 +525,8 @@ def plot_spectro(spectrogram: torch.Tensor,
 def ex_charmap():
     charmap = CharMap()
 
+    print(f"The charmap contains {len(charmap.idx2char)} symbols")
+
     # Some encoding/decoding tests
     utterance = "Je vais m'éclater avec des RNNs !"
     encoded = charmap.encode(utterance)
@@ -760,7 +762,7 @@ if __name__ == '__main__':
     #@TEMPL@pass
     #@SOL
     # order_by_length()
-    # ex_charmap()
+    ex_charmap()
     # test_spectro()
     # ex_waveform_spectro()
     # ex_spectro()
