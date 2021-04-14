@@ -149,9 +149,9 @@ data.test_charmap()
 
 Note: At the time of writing, there is some issues with the encoding of some special characters (like œ or ç)are not correctly handled.
 
-## CTC Model
+## CTC Model 
 
-The CTC model we implement is made of a convolutional network followed by a recurrent network then followed by a linear layer producing a probability distribution over the vocabulary which contains the special blank symbol introduced by A. Graves in his work on Connectionist Temporal Classification. To see more about the architecture, check the [models.py](https://github.com/jeremyfix/listen-attend-and-spell/blob/main/scripts/models.py#L52). The implementation of this repository considers bidirectional recurrent layers, which makes sense if you have access to the full recording before trying to transcribe it.
+The CTC model we implement is made of a convolutional network followed by a recurrent network then followed by a linear layer producing a probability distribution over the vocabulary which contains the special blank symbol introduced by A. Graves in his work on [Connectionist Temporal Classification](https://www.cs.toronto.edu/~graves/icml_2006.pdf). To see more about the architecture, check the [models.py](https://github.com/jeremyfix/listen-attend-and-spell/blob/main/scripts/models.py#L52). The implementation of this repository considers bidirectional recurrent layers, which makes sense if you have access to the full recording before trying to transcribe it.
 
 The loss is then the CTC loss which computes the probability of a target sequence by marginalizing over all the possible sequences that contain the blank, empty symbol. The CTC loss is an option for situation where the input sequence is always longer than the input sequence. If the input sequence is of length 5 and the target sequence is, say, 'a','b','c', then the probability of this target sequence is computed by summing the probabilities that your model assign to all the following sequences :
 
@@ -164,6 +164,15 @@ The loss is then the CTC loss which computes the probability of a target sequenc
 - ...
 
 There is a very interesting article on [distill.pub](https://distill.pub/2017/ctc/) on the CTC loss.
+
+**TODO** : example with the pytorch CTC loss
+
+Decoding from this model is specific as well and performed with beam search by considering the most likely sequence hypothesis.
+
+
+## Seq2Seq with attention
+
+**TO BE DONE :-) **
 
 # References
 
