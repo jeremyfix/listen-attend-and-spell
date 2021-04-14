@@ -409,6 +409,8 @@ def get_dataloaders(commonvoice_root: str,
     """
 
     def dataset_loader(fold):
+        if logger is not None:
+            logger.info(f"Loading the fold {fold}")
         return DatasetFilter(
             ds = load_dataset(fold,
                               commonvoice_root=commonvoice_root,
@@ -610,7 +612,7 @@ def ex_waveform_spectro():
     plt.savefig("waveform_to_spectro.png")
     plt.show()
 
-def ex_spectro():
+def test_spectro_batch():
 
     charmap = CharMap()
 
@@ -659,7 +661,7 @@ def ex_spectro():
     plt.savefig('spectro.png')
     plt.show()
 
-def ex_augmented_spectro():
+def test_augmented_spectro():
     charmap = CharMap()
 
     # Data loading
@@ -765,8 +767,7 @@ if __name__ == '__main__':
     # order_by_length()
     test_charmap()
     test_spectro()
-    # ex_waveform_spectro()
-    # ex_spectro()
-    # ex_augmented_spectro()
-    pass
+    ex_waveform_spectro()
+    test_spectro_batch()
+    test_augmented_spectro()
     #SOL@

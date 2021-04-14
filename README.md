@@ -74,6 +74,14 @@ The task consists in transforming a recorded waveform into the textual transcrip
 
 ![Waveform to spectrogram](https://raw.githubusercontent.com/jeremyfix/listen-attend-and-spell/main/figs/waveform_to_spectro.png)
 
+This image has been generated with :
+
+```python
+import scripts.data as data
+
+data.ex_waveform_spectro()
+```
+
 Computing the spectrogram with a Short Time Fourier Transform (window size of 25ms with a window step of 15 ms), we get the example spectrograms in Mel scale (with 80 filters) below :
 
 ![Spectrogram](https://raw.githubusercontent.com/jeremyfix/listen-attend-and-spell/main/figs/spectro.png)
@@ -85,6 +93,23 @@ In the code `scripts/data.py`, the data are loaded by the data.py:get_dataloader
 - normalize the spectrograms by subtracting the mean and dividing by the variance 
 
 A dataloader, when iterated, is returning mini batches. In the provided code, the waveforms in the minibatches are right-padded (see the BatchCollate:__call__ function) to be of the same duration. The spectrogram computation, and possibly data augmentation by frequency and time masking, is performed by the WaveformProcessor object. 
+
+For testing the spectrogram augmentation (frequency and time masking), you can run
+
+```python
+import scripts.data as data
+
+data.test_augmented_spectro()
+```
+
+For testing the spectrogram augmentation and padding for the minibatch construction, you can run :
+
+```python
+import scripts.data as data
+
+data.ex_spectro()
+```
+
 
 The CommonVoice data are sampled at 48 kHz. Here, during the processing, the waveforms are resampled at 16 kHz. The FFT is done on windows of 25 ms and shifted by 15 ms. Hence, a sample of 5 seconds will produce an original waveform of 240.000 samples, a resampled waveform of 80.000 samples and a spectrogram of 330 samples. Given a FFT with a shift 15 ms, we also have a spectrogram at almost 67 Hz. The melscale, as in deepspeech2, we use 80 scales. The processing of the waveforms is done with [torchaudio](https://pytorch.org/audio/stable/index.html).
 
