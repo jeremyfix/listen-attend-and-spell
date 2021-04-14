@@ -41,7 +41,7 @@ The data we use are provided by the [Common voice Mozilla project](https://commo
 
 ## Vocabulary
 
-The LAS model outputs the text transcription character by character. In this implementation, dealing with the French language, the transcripts are converted to lower case and the vocabulary is [a-z, 0-9, space , period, comma, apostrophe ]. In addition, all the accents were removed (replaced with the letters without accent), the punctuation was either replaced by a period or a space, the 'œ' and 'ç' were also replaced. See the [data.CharMap](https://github.com/jeremyfix/listen-attend-and-spell/blob/05dc9aa60055b318625e40cec8141fa1fa69054c/data.py#L37) object. 
+The LAS model outputs the text transcription character by character. In this implementation, dealing with the French language, the transcripts are converted to lower case and the vocabulary is [a-z, 0-9, space , period, comma, apostrophe ]. In addition, all the accents were removed (replaced with the letters without accent), the punctuation was either replaced by a period or a space, the 'œ' and 'ç' were also replaced. See the [data.CharMap](https://github.com/jeremyfix/listen-attend-and-spell/blob/main/scripts/data.py#L37) object. 
 
 
 ## Training
@@ -148,6 +148,26 @@ data.test_charmap()
 ```
 
 Note: At the time of writing, there is some issues with the encoding of some special characters (like œ or ç)are not correctly handled.
+
+## CTC Model
+
+The CTC model we implement is made of a convolutional network followed by a recurrent network then followed by a linear layer producing a probability distribution over the vocabulary which contains the special blank symbol introduced by A. Graves in his work on Connectionist Temporal Classification. To see more about the architecture, check the [models.py](https://github.com/jeremyfix/listen-attend-and-spell/blob/main/scripts/models.py#L52) )
+
+The loss is then the CTC loss which computes the probability of a target sequence by marginalizing over all the possible sequences that contain the blank, empty symbol. The CTC loss is an option for situation where the input sequence is always longer than the input sequence. If the input sequence is of length 5 and the target sequence is, say, 'a','b','c', then the probability of this target sequence is computed by summing the probabilities that your model assign to all the following sequences :
+
+- <blank>,<blank>,a,b,c
+- <blank>, a, <blank>, b, c
+- <blank>, a, b, <blank>, c
+- <blank>, a, b, c, <blank>
+- a, <blank>,<blank>,b, c
+- a, <blank>,b, <blank>, c
+- ...
+
+There is a very interesting article on [distill.pub](https://distill.pub/2017/ctc/) on the CTC loss.
+
+
+
+
 
 # References
 
