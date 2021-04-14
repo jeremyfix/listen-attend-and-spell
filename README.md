@@ -1,10 +1,8 @@
-# Pytorch implementation of Show, Attend and Tell \[Chan, 2016\]
+# Pytorch implementation of Show, Attend and Tell \[Chan, 2016\] and DeepSpeech models
 
-**Note** This is an experimental code that I used for preparing a labwork
+**Note** This is an experimental code that I used for preparing a labwork. Hence the code is full of symbols "@SOL@" or so that I use for getting a template script code for the students with the [easylabwork](https://github.com/jeremyfix/easylabwork) package. By the way, if you forget about these tags, the code can be ran for training and testing speech to text models.
 
-
-This is a tentative pytorch reimplementation of the image captioning network Listen, Attend and Spell.
-
+The two models I consider are the CTC based model DeepSpeech [Amodei(2015)] and the attentive Seq2Seq model Listen, Attend and Spell [Chan(2016)].
 
 ```
 @INPROCEEDINGS{7472621,
@@ -18,6 +16,20 @@ This is a tentative pytorch reimplementation of the image captioning network Lis
   pages={4960-4964},
   doi={10.1109/ICASSP.2016.7472621}
 }
+
+@inproceedings{10.5555/3045390.3045410,
+author = {Amodei, Dario and Ananthanarayanan, Sundaram and Anubhai, Rishita and Bai, Jingliang and Battenberg, Eric and Case, Carl and Casper, Jared and Catanzaro, Bryan and Cheng, Qiang and Chen, Guoliang and Chen, Jie and Chen, Jingdong and Chen, Zhijie and Chrzanowski, Mike and Coates, Adam and Diamos, Greg and Ding, Ke and Du, Niandong and Elsen, Erich and Engel, Jesse and Fang, Weiwei and Fan, Linxi and Fougner, Christopher and Gao, Liang and Gong, Caixia and Hannun, Awni and Han, Tony and Johannes, Lappi Vaino and Jiang, Bing and Ju, Cai and Jun, Billy and LeGresley, Patrick and Lin, Libby and Liu, Junjie and Liu, Yang and Li, Weigao and Li, Xiangang and Ma, Dongpeng and Narang, Sharan and Ng, Andrew and Ozair, Sherjil and Peng, Yiping and Prenger, Ryan and Qian, Sheng and Quan, Zongfeng and Raiman, Jonathan and Rao, Vinay and Satheesh, Sanjeev and Seetapun, David and Sengupta, Shubho and Srinet, Kavya and Sriram, Anuroop and Tang, Haiyuan and Tang, Liliang and Wang, Chong and Wang, Jidong and Wang, Kaifu and Wang, Yi and Wang, Zhijian and Wang, Zhiqian and Wu, Shuang and Wei, Likai and Xiao, Bo and Xie, Wen and Xie, Yan and Yogatama, Dani and Yuan, Bin and Zhan, Jun and Zhu, Zhenyao},
+title = {Deep Speech 2: End-to-End Speech Recognition in English and Mandarin},
+year = {2016},
+publisher = {JMLR.org},
+abstract = {We show that an end-to-end deep learning approach can be used to recognize either English or Mandarin Chinese speech-two vastly different languages. Because it replaces entire pipelines of hand-engineered components with neural networks, end-to-end learning allows us to handle a diverse variety of speech including noisy environments, accents and different languages. Key to our approach is our application of HPC techniques, enabling experiments that previously took weeks to now run in days. This allows us to iterate more quickly to identify superior architectures and algorithms. As a result, in several cases, our system is competitive with the transcription of human workers when benchmarked on standard datasets. Finally, using a technique called Batch Dispatch with GPUs in the data center, we show that our system can be inexpensively deployed in an online setting, delivering low latency when serving users at scale.},
+booktitle = {Proceedings of the 33rd International Conference on International Conference on Machine Learning - Volume 48},
+pages = {173–182},
+numpages = {10},
+location = {New York, NY, USA},
+series = {ICML'16}
+}
+
 ```
 
 # How to
