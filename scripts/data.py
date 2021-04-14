@@ -27,14 +27,14 @@ _DEFAULT_WIN_STEP = 15  # ms
 _DEFAULT_NUM_MELS = 80
 
 
-def unpack_ravel(tensor: PackedSequence):
-    unpacked_tensor, lens_tensor = pad_packed_sequence(tensor)  # T, B, *
-    raveled = torch.cat([
-        tensori[:leni] for tensori, leni in zip(unpacked_tensor,
-                                                lens_tensor)
-    ], 0)
-    # raveled is (Tcum, num_features)
-    return raveled
+# def unpack_ravel(tensor: PackedSequence):
+#     unpacked_tensor, lens_tensor = pad_packed_sequence(tensor)  # T, B, *
+#     raveled = torch.cat([
+#         tensori[:leni] for tensori, leni in zip(unpacked_tensor,
+#                                                 lens_tensor)
+#     ], 0)
+#     # raveled is (Tcum, num_features)
+#     return raveled
 
 def load_dataset(fold: str,
                  commonvoice_root: Union[str, Path],
