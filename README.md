@@ -155,15 +155,21 @@ The CTC model we implement is made of a convolutional network followed by a recu
 
 The loss is then the CTC loss which computes the probability of a target sequence by marginalizing over all the possible sequences that contain the blank, empty symbol. The CTC loss is an option for situation where the input sequence is always longer than the input sequence. If the input sequence is of length 5 and the target sequence is, say, 'a','b','c', then the probability of this target sequence is computed by summing the probabilities that your model assign to all the following sequences :
 
-- <blank>,<blank>,a,b,c
-- <blank>, a, <blank>, b, c
-- <blank>, a, b, <blank>, c
-- <blank>, a, b, c, <blank>
-- a, <blank>,<blank>,b, c
-- a, <blank>,b, <blank>, c
+- ¬,¬,a,b,c
+- ¬, a, ¬, b, c
+- ¬, a, b, ¬, c
+- ¬, a, b, c, ¬
+- a, ¬, ¬,b, c
+- a, ¬,b, ¬, c
+- ...
+- a, a, a, b, c
 - ...
 
-There is a very interesting article on [distill.pub](https://distill.pub/2017/ctc/) on the CTC loss.
+Remember that in the CTC paradigm, repetitions of the same symbol get collapsed.
+
+There is a very interesting article on [distill.pub](https://distill.pub/2017/ctc/) on the CTC loss. Let us consider an example. We will work with an input sequence of length 3, a vocabulary [¬, 'a', 'b'], a target sequence of length 2 which is 'ab'. The probability of the target sequence will be the sum of the probabilities of the 5 sequences '¬ab', 'a¬b', 'ab¬', 'aab', 'abb'.
+
+
 
 **TODO** : example with the pytorch CTC loss
 
