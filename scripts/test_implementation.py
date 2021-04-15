@@ -5,6 +5,7 @@ import sys
 import inspect
 # External imports
 import torch
+import torch.nn as nn
 from torch.nn.utils.rnn import PackedSequence
 # Local imports
 import data
@@ -202,11 +203,39 @@ def test_model_out():
         if _RERAISE: raise
 
 
+def test_ctc():
+    '''
+    Script to experiment with the CTC loss on a single sample B=1
+    '''
+    blank_id = 0
+    loss = nn.CTCLoss(blank_id, reduction='sum')
+
+    batch_size = 1
+    input_length = 3
+    num_classes = 3  # a , b , blank
+    probs = torch.ones(input_length, batch_size, num_classes)
+    log_probs = probs.log()
+    targets = torch.tensor([1, 2]) # padded sequence a, b
+    input_lengths = torch.tensor([input_length])
+    target_lengths = torch.tensor([2])
+
+    # Compute the loss involving the probability of the target sequence
+    # which is itself computed by marginalizing over all the possible
+    # sequences with the blank that match the target
+    # With one target :
+    # -log(P(Y|X)) = -log(\sum_a \prod_t pt(a_t|X))
+
+    prob_y_x = (-loss(log_probs, targets, input_lengths, target_lengths)).exp()
+    print(f"The probability of the target sequence is  {prob_y_x}")
+
+
+
 if __name__ == '__main__':
     _RERAISE = True
 
-    test_waveform_processor()
-    test_dataloaders()
-    test_model_cnn()
-    test_model_rnn()
-    test_model_out()
+    # test_waveform_processor()
+    # test_dataloaders()
+    # test_model_cnn()
+    # test_model_rnn()
+    # test_model_out()
+    test_ctc()
