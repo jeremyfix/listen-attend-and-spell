@@ -208,14 +208,20 @@ def test_ctc():
     Script to experiment with the CTC loss on a single sample B=1
     '''
     blank_id = 0
-    loss = nn.CTCLoss(blank_id, reduction='sum')
+    loss = nn.CTCLoss(blank_id, reduction='mean')
 
     batch_size = 1
     input_length = 3
     num_classes = 3  # a , b , blank
     probs = torch.ones(input_length, batch_size, num_classes)
+    pblank = 0.25
+    pa = 0.35
+    pb = 0.4
+    probs[0] = torch.tensor([[pblank, pa, pb]])
+    probs[1] = torch.tensor([[pblank, pa, pb]])
+    probs[2] = torch.tensor([[pblank, pa, pb]])
     log_probs = probs.log()
-    targets = torch.tensor([1, 2]) # padded sequence a, b
+    targets = torch.tensor([1, 2])  # padded sequence a, b
     input_lengths = torch.tensor([input_length])
     target_lengths = torch.tensor([2])
 
@@ -225,9 +231,9 @@ def test_ctc():
     # With one target :
     # -log(P(Y|X)) = -log(\sum_a \prod_t pt(a_t|X))
 
-    prob_y_x = (-loss(log_probs, targets, input_lengths, target_lengths)).exp()
-    print(f"The probability of the target sequence is  {prob_y_x}")
-
+    prob_y_x = (-batch_size * target_lengths[0] * loss(log_probs, targets, input_lengths, target_lengths)).exp()
+    prob_y_x_man = 3 * pblank * pa * pb + pa * pa * pb + pa * pb * pb
+    print(f"The probability of the target sequence is  {prob_y_x}, {prob_y_x_man}")
 
 
 if __name__ == '__main__':
